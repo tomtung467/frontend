@@ -84,10 +84,10 @@
 <script setup>
 import { ref } from "vue";
 import { useRouter } from "vue-router";
-import { loginService } from "../features/login/loginService";
-import { saveAuthData } from "../functions/authStorage";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 const router = useRouter();
+const authStore = useAuthStore();
 
 const email = ref("");
 const password = ref("");
@@ -107,13 +107,11 @@ const handleRoleLogin = async (role) => {
   try {
     loading.value = true;
 
-    const data = await loginService({
+    // Sử dụng Pinia store để đăng nhập
+    await authStore.login({
       email: email.value.trim(),
       password: password.value.trim(),
-      role,
     });
-
-    saveAuthData(data);
 
     if (rememberMe.value) {
       localStorage.setItem("rememberEmail", email.value);
@@ -121,7 +119,8 @@ const handleRoleLogin = async (role) => {
       localStorage.removeItem("rememberEmail");
     }
 
-    router.push("/dashboard");
+    // Chuyển hướng sau khi đăng nhập thành công
+    await router.push("/dashboard");
   } catch (err) {
     error.value = err?.response?.data?.message || "Đăng nhập thất bại";
   } finally {

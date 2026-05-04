@@ -7,9 +7,9 @@ export const registerService = async ({
   confirmPassword,
 }) => {
   return await registerApi({
-    fullName,
+    name: fullName,
     email,
     password,
-    confirmPassword,
+    password_confirmation: confirmPassword,
   });
 };

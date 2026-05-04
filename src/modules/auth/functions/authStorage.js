@@ -1,5 +1,8 @@
 export const saveAuthData = (data) => {
-  if (data?.token) {
+  // Salvar token com a chave correta
+  if (data?.access_token) {
+    localStorage.setItem("token", data.access_token);
+  } else if (data?.token) {
     localStorage.setItem("token", data.token);
   }
 
