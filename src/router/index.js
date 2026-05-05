@@ -124,6 +124,26 @@ const routes = [
     component: () => import("@/modules/billing/views/InvoicesView.vue"),
     meta: { requiresAuth: true, role: ["staff", "manager"] },
   },
+
+  // User Settings Module
+  {
+    path: "/profile",
+    name: "Profile",
+    component: () => import("@/modules/auth/view/ProfileView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/settings",
+    name: "Settings",
+    component: () => import("@/modules/auth/view/SettingsView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/change-password",
+    name: "ChangePassword",
+    component: () => import("@/modules/auth/view/ChangePasswordView.vue"),
+    meta: { requiresAuth: true },
+  },
 ];
 
 const router = createRouter({
