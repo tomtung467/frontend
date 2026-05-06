@@ -34,6 +34,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { isAbortError } from '@/api/requestManager'
 import { useTableStore } from '@/stores/useTableStore'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
@@ -42,8 +43,12 @@ const tableStore = useTableStore()
 const tables = ref([])
 
 onMounted(async () => {
-  await tableStore.fetchTables()
-  tables.value = tableStore.tables
+  try {
+    await tableStore.fetchTables({ summary: 1 })
+    tables.value = tableStore.tables
+  } catch (err) {
+    if (!isAbortError(err)) throw err
+  }
 })
 
 async function updateStatus(tableId, status) {

@@ -3,7 +3,7 @@
     <div class="container">
       <header class="customer-topbar">
         <button @click="continueShopping" class="btn-continue compact">Back to menu</button>
-        <h1>Current Bill</h1>
+        <h1>{{ tableId ? `Current Bill - Table ${tableId}` : 'Current Bill' }}</h1>
         <button @click="logout" class="btn-logout">Logout</button>
       </header>
 
@@ -58,7 +58,7 @@
 
       <div v-else class="empty-cart">
         <h2>Your cart is empty</h2>
-        <router-link to="/menu" class="btn-back">
+        <router-link :to="tableId ? `/menu/table/${tableId}` : '/menu'" class="btn-back">
           Back to Menu
         </router-link>
       </div>
@@ -67,13 +67,20 @@
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
+import { computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/useCartStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 
 const router = useRouter()
+const route = useRoute()
 const cartStore = useCartStore()
 const authStore = useAuthStore()
+const tableId = computed(() => route.params.tableId || cartStore.tableId)
+
+onMounted(() => {
+  if (route.params.tableId) cartStore.setTable(route.params.tableId)
+})
 
 function increaseQuantity(foodId) {
   const item = cartStore.items.find(i => i.food_id === foodId)
@@ -94,14 +101,14 @@ function removeItem(foodId) {
 }
 
 function continueShopping() {
-  router.push('/menu')
+  router.push(tableId.value ? `/menu/table/${tableId.value}` : '/menu')
 }
 
 async function checkout() {
   try {
     await cartStore.checkout('card')
     alert('Order sent. If this table already has an open bill, the items were added to it.')
-    router.push('/orders')
+    router.push(tableId.value ? `/orders/table/${tableId.value}` : '/orders')
   } catch (err) {
     alert('Checkout failed: ' + err.message)
   }

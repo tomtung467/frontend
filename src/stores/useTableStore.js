@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '@/api'
+import { isAbortError } from '@/api/requestManager'
 
 export const useTableStore = defineStore('table', () => {
   const tables = ref([])
@@ -8,13 +9,14 @@ export const useTableStore = defineStore('table', () => {
   const loading = ref(false)
   const error = ref(null)
 
-  async function fetchTables() {
+  async function fetchTables(filters = {}) {
     loading.value = true
     error.value = null
     try {
-      const response = await api.get('/tables')
+      const response = await api.get('/tables', { params: filters })
       tables.value = response.data
     } catch (err) {
+      if (isAbortError(err)) throw err
       error.value = 'Failed to fetch tables'
       console.error(err)
     } finally {
@@ -27,6 +29,7 @@ export const useTableStore = defineStore('table', () => {
       const response = await api.get(`/tables/${tableId}`)
       return response.data
     } catch (err) {
+      if (isAbortError(err)) throw err
       error.value = 'Failed to fetch table details'
       throw err
     }
@@ -41,6 +44,7 @@ export const useTableStore = defineStore('table', () => {
       }
       return response.data
     } catch (err) {
+      if (isAbortError(err)) throw err
       error.value = 'Failed to update table status'
       throw err
     }

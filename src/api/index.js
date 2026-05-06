@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { attachAbortController, isAbortError, releaseAbortController } from './requestManager'
 
 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
@@ -12,6 +13,7 @@ const api = axios.create({
 // Add token to requests
 api.interceptors.request.use(
   (config) => {
+    config = attachAbortController(config)
     const token = localStorage.getItem('token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
@@ -23,8 +25,16 @@ api.interceptors.request.use(
 
 // Handle responses
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    releaseAbortController(response.config)
+    return response
+  },
   async (error) => {
+    releaseAbortController(error.config)
+    if (isAbortError(error)) {
+      return Promise.reject(error)
+    }
+
     const originalRequest = error.config
 
     if (error.response?.status === 401 && !originalRequest._retry) {

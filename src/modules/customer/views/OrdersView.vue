@@ -3,7 +3,7 @@
     <main class="orders-page">
       <MasterPageHeader title="Đơn của tôi">
         <template #actions>
-          <router-link to="/menu" class="ghost-action">Gọi thêm món</router-link>
+          <router-link :to="tableId ? `/menu/table/${tableId}` : '/menu'" class="ghost-action">Gọi thêm món</router-link>
           <button @click="loadOrders" class="ghost-action">Làm mới</button>
         </template>
       </MasterPageHeader>
@@ -67,7 +67,7 @@
 
       <section v-else class="state empty">
         <h2>Chưa có đơn hàng</h2>
-        <router-link to="/menu" class="primary-link">Xem thực đơn</router-link>
+        <router-link :to="tableId ? `/menu/table/${tableId}` : '/menu'" class="primary-link">Xem thực đơn</router-link>
       </section>
     </main>
   </MasterLayout>
@@ -75,13 +75,16 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { useOrderStore } from '@/stores/useOrderStore'
 
 const orderStore = useOrderStore()
+const route = useRoute()
 const loading = ref(false)
 const error = ref('')
+const tableId = computed(() => route.params.tableId || '')
 
 const orders = computed(() => Array.isArray(orderStore.orders) ? orderStore.orders : [])
 const activeOrders = computed(() => orders.value.filter((order) => ['pending', 'confirmed', 'in_progress'].includes(order.status)))
@@ -94,7 +97,7 @@ async function loadOrders() {
   loading.value = true
   error.value = ''
   try {
-    await orderStore.fetchOrders()
+    await orderStore.fetchOrders(tableId.value ? { table_id: tableId.value } : {})
   } catch (err) {
     error.value = err.message || 'Không thể tải đơn hàng.'
   } finally {

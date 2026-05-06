@@ -67,6 +67,10 @@ export default class PaymentService extends BaseService {
     return this.get('/invoices', { params: filters })
   }
 
+  async getCurrentBills(filters = {}) {
+    return this.get('/invoices/current', { params: filters })
+  }
+
   /**
    * Get order invoices
    * @param {number} orderId - Order ID

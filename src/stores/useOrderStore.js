@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '@/api'
+import { isAbortError } from '@/api/requestManager'
 
 export const useOrderStore = defineStore('order', () => {
   const orders = ref([])
@@ -16,6 +17,7 @@ export const useOrderStore = defineStore('order', () => {
       const response = await api.get(`/orders?${params.toString()}`)
       orders.value = response.data?.data?.data || response.data?.data || response.data
     } catch (err) {
+      if (isAbortError(err)) throw err
       error.value = 'Failed to fetch orders'
       console.error(err)
     } finally {
@@ -32,6 +34,7 @@ export const useOrderStore = defineStore('order', () => {
       orders.value.push(currentOrder.value)
       return currentOrder.value
     } catch (err) {
+      if (isAbortError(err)) throw err
       error.value = 'Failed to create order'
       console.error(err)
       throw err
@@ -55,6 +58,7 @@ export const useOrderStore = defineStore('order', () => {
       }
       return updated
     } catch (err) {
+      if (isAbortError(err)) throw err
       error.value = 'Failed to update order'
       console.error(err)
       throw err

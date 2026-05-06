@@ -14,8 +14,8 @@ export default class MenuService extends BaseService {
   /**
    * Get all categories
    */
-  async getCategories() {
-    return this.get('/categories')
+  async getCategories(filters = {}) {
+    return this.get('/categories', { params: filters })
   }
 
   /**

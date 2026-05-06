@@ -107,6 +107,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { isAbortError } from '@/api/requestManager'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { analyticsService, inventoryService, orderService, paymentService, tableService } from '@/services'
@@ -163,11 +164,15 @@ onMounted(loadDashboard)
 async function loadDashboard() {
   const results = await Promise.allSettled([
     analyticsService.getDashboardData({ period: 'today' }),
-    tableService.getAllTables(),
-    orderService.getOrders(),
-    inventoryService.getInventory(),
-    paymentService.getPayments(),
+    tableService.getAllTables({ summary: 1 }),
+    orderService.getOrders({ summary: 1, limit: 8 }),
+    inventoryService.getInventory({ summary: 1, limit: 8 }),
+    paymentService.getPayments({ summary: 1, limit: 5 }),
   ])
+
+  if (results.some((result) => result.reason && !isAbortError(result.reason))) {
+    console.warn('Some dashboard widgets failed to load', results)
+  }
 
   dashboardData.value = results[0].value || {}
   tables.value = normalizeList(results[1].value)

@@ -7,6 +7,8 @@ import NotFoundView from "../views/errors/NotFoundView.vue";
 import UnauthorizedView from "../views/errors/UnauthorizedView.vue";
 import ServerErrorView from "../views/errors/ServerErrorView.vue";
 import { canAccessPermission } from "@/config/permissions";
+import { beginRouteScope } from "@/api/requestManager";
+import { clearAllInFlight } from "@/api/getCache";
 
 const routes = [
   {
@@ -46,8 +48,20 @@ const routes = [
     meta: { requiresAuth: true, role: "customer" },
   },
   {
+    path: "/menu/table/:tableId",
+    name: "TableMenu",
+    component: () => import("@/modules/customer/views/MenuView.vue"),
+    meta: { requiresAuth: true, role: "customer" },
+  },
+  {
     path: "/cart",
     name: "Cart",
+    component: () => import("@/modules/customer/views/CartView.vue"),
+    meta: { requiresAuth: true, role: "customer" },
+  },
+  {
+    path: "/cart/table/:tableId",
+    name: "TableCart",
     component: () => import("@/modules/customer/views/CartView.vue"),
     meta: { requiresAuth: true, role: "customer" },
   },
@@ -56,6 +70,12 @@ const routes = [
     name: "Orders",
     component: () => import("@/modules/customer/views/OrdersView.vue"),
     meta: { requiresAuth: true },
+  },
+  {
+    path: "/orders/table/:tableId",
+    name: "TableOrders",
+    component: () => import("@/modules/customer/views/OrdersView.vue"),
+    meta: { requiresAuth: true, role: "customer" },
   },
 
   // Operations Module
@@ -198,6 +218,9 @@ const router = createRouter({
 
 // Navigation guard
 router.beforeEach(async (to) => {
+  beginRouteScope();
+  clearAllInFlight();
+
   const authStore = useAuthStore();
 
   if (authStore.isAuthenticated && !authStore.user) {

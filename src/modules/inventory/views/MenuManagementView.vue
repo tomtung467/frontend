@@ -70,6 +70,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { isAbortError } from '@/api/requestManager'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { menuService } from '@/services'
@@ -112,12 +113,13 @@ async function loadData() {
   error.value = ''
   try {
     const [foodList, categoryList] = await Promise.all([
-      menuService.getFoods(),
-      menuService.getCategories(),
+      menuService.getFoods({ fields: 'id,name,price,category_id,description,is_available,is_popular,image_url,preparation_time' }),
+      menuService.getCategories({ simple: 1 }),
     ])
     foods.value = foodList
     categories.value = categoryList
   } catch (err) {
+    if (isAbortError(err)) return
     error.value = err.message || 'Failed to load menu.'
   } finally {
     loading.value = false

@@ -12,10 +12,15 @@
           <button :class="{ active: visitMode === 'reservation' }" @click="visitMode = 'reservation'">Reserve</button>
         </div>
         <label>Table</label>
-        <select v-model="selectedTableId" @change="cartStore.setTable(selectedTableId)">
+        <select v-model="selectedTableId" @change="selectTable">
           <option value="">Select table</option>
-          <option v-for="table in tables" :key="table.id" :value="table.id">
-            Table {{ table.table_number || table.id }} - {{ table.capacity || 4 }} seats
+          <option
+            v-for="table in tables"
+            :key="table.id"
+            :value="table.id"
+            :disabled="visitMode === 'reservation' && table.status !== 'empty'"
+          >
+            Table {{ table.table_number || table.id }} - {{ table.capacity || 4 }} seats{{ table.status !== 'empty' ? ' - busy' : '' }}
           </option>
         </select>
       </div>
@@ -80,31 +85,32 @@
         <strong>{{ cartStore.itemCount }} items</strong>
         <span>{{ formatPrice(cartStore.totalPrice) }}</span>
       </div>
-      <router-link to="/cart">View cart</router-link>
+      <router-link :to="cartPath">View cart</router-link>
     </div>
   </main>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import api from '@/api'
 import { useMenuStore } from '@/stores/useMenuStore'
 import { useCartStore } from '@/stores/useCartStore'
 import { useTableStore } from '@/stores/useTableStore'
 import { useAuthStore } from '@/stores/useAuthStore'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 const menuStore = useMenuStore()
 const cartStore = useCartStore()
 const tableStore = useTableStore()
 const authStore = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 const categories = ref([])
 const foods = ref([])
 const tables = ref([])
 const selectedCategory = ref(null)
-const selectedTableId = ref(cartStore.tableId || '')
+const selectedTableId = ref(route.params.tableId || cartStore.tableId || '')
 const visitMode = ref('dine_in')
 const loading = ref(false)
 const error = ref('')
@@ -121,9 +127,12 @@ const reservation = reactive({
   special_requests: '',
 })
 
+const cartPath = computed(() => selectedTableId.value ? `/cart/table/${selectedTableId.value}` : '/cart')
+
 onMounted(async () => {
   loading.value = true
   try {
+    if (selectedTableId.value) cartStore.setTable(selectedTableId.value)
     await Promise.all([menuStore.fetchCategories(), tableStore.fetchTables()])
     categories.value = menuStore.categories
     tables.value = tableStore.tables
@@ -152,7 +161,19 @@ async function selectCategory(category) {
 }
 
 function addToCart(food) {
+  if (!selectedTableId.value) {
+    error.value = 'Please select a table before adding dishes.'
+    return
+  }
+  cartStore.setTable(selectedTableId.value)
   cartStore.addItem(food)
+}
+
+function selectTable() {
+  cartStore.setTable(selectedTableId.value)
+  if (selectedTableId.value && route.params.tableId !== String(selectedTableId.value)) {
+    router.replace(`/menu/table/${selectedTableId.value}`)
+  }
 }
 
 async function logout() {
@@ -166,11 +187,21 @@ async function reserveTable() {
     reservationMessage.value = 'Please select a table first.'
     return
   }
+  const table = tables.value.find((item) => Number(item.id) === Number(tableId))
+  if (table?.status !== 'empty') {
+    reservationMessage.value = 'Only empty tables can be reserved.'
+    return
+  }
   reservationSaving.value = true
   reservationMessage.value = ''
   try {
     const reservationTime = reservation.reservation_time.replace('T', ' ') + ':00'
-    await api.post('/reservations', { ...reservation, table_id: tableId, reservation_time: reservationTime })
+    await api.post('/reservations', {
+      ...reservation,
+      table_id: tableId,
+      reservation_time: reservationTime,
+      pre_order_items: cartStore.items,
+    })
     reservationMessage.value = 'Reservation request saved.'
     Object.assign(reservation, {
       table_id: '',
