@@ -1,7 +1,11 @@
 <template>
   <div class="cart-view">
     <div class="container">
-      <h1>Shopping Cart</h1>
+      <header class="customer-topbar">
+        <button @click="continueShopping" class="btn-continue compact">Back to menu</button>
+        <h1>Current Bill</h1>
+        <button @click="logout" class="btn-logout">Logout</button>
+      </header>
 
       <div v-if="cartStore.items.length > 0" class="cart-content">
         <div class="cart-items">
@@ -44,7 +48,7 @@
           </div>
 
           <button @click="checkout" class="btn-checkout">
-            Proceed to Checkout
+            Send order / add to bill
           </button>
           <button @click="continueShopping" class="btn-continue">
             Continue Shopping
@@ -65,9 +69,11 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/useCartStore'
+import { useAuthStore } from '@/stores/useAuthStore'
 
 const router = useRouter()
 const cartStore = useCartStore()
+const authStore = useAuthStore()
 
 function increaseQuantity(foodId) {
   const item = cartStore.items.find(i => i.food_id === foodId)
@@ -94,11 +100,16 @@ function continueShopping() {
 async function checkout() {
   try {
     await cartStore.checkout('card')
-    alert('Order placed successfully!')
+    alert('Order sent. If this table already has an open bill, the items were added to it.')
     router.push('/orders')
   } catch (err) {
     alert('Checkout failed: ' + err.message)
   }
+}
+
+async function logout() {
+  await authStore.logout()
+  router.push('/login')
 }
 
 function formatPrice(price) {
@@ -123,8 +134,26 @@ function formatPrice(price) {
 
 h1 {
   text-align: center;
-  margin-bottom: 30px;
+  margin: 0;
   color: #333;
+}
+
+.customer-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.btn-logout {
+  background: #111827;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
 }
 
 .cart-content {
@@ -248,6 +277,11 @@ h1 {
   cursor: pointer;
   font-weight: bold;
   transition: background-color 0.3s;
+}
+
+.btn-continue.compact {
+  width: auto;
+  margin-top: 0;
 }
 
 .btn-checkout {

@@ -9,6 +9,23 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false)
   const error = ref(null)
 
+  /**
+   * Get default route based on user role
+   */
+  function getDefaultRoute() {
+    if (!user.value) return '/login'
+    
+    const roleRoutes = {
+      customer: '/menu',
+      staff: '/floor-plan',
+      chef: '/kitchen',
+      manager: '/dashboard',
+      admin: '/dashboard',
+    }
+    
+    return roleRoutes[user.value.role] || '/menu'
+  }
+
   async function login(credentials) {
     loading.value = true
     error.value = null
@@ -93,5 +110,6 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     refreshToken,
     getCurrentUser,
+    getDefaultRoute,
   }
 })

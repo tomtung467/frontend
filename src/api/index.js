@@ -1,12 +1,9 @@
 import axios from 'axios'
 
-// Debug: Log the API URL being used
 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
-console.log('API URL:', apiUrl)
-console.log('VITE_API_URL env:', import.meta.env.VITE_API_URL)
 
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api',  // Force port 8000 for testing
+  baseURL: apiUrl,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -44,7 +41,7 @@ api.interceptors.response.use(
           }
         )
 
-        const { access_token } = response.data
+        const { access_token } = response.data.data || response.data
         localStorage.setItem('token', access_token)
         api.defaults.headers.Authorization = `Bearer ${access_token}`
 

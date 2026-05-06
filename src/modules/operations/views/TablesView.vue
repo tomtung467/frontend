@@ -1,26 +1,29 @@
 <template>
   <MasterLayout show-footer>
     <div class="tables-view">
-      <h1>Table Management</h1>
+      <MasterPageHeader title="Quản lý bàn" />
       <div class="tables-list">
         <div v-for="table in tables" :key="table.id" class="table-card">
           <div class="table-header">
-            <h3>Table {{ table.table_number }}</h3>
-            <span class="status" :class="table.status">{{ table.status }}</span>
+            <h3>Bàn {{ table.table_number }}</h3>
+            <span class="status" :class="normalizedStatus(table)">{{ statusLabel(table) }}</span>
           </div>
           <div class="table-info">
-            <p><strong>Capacity:</strong> {{ table.capacity }} seats</p>
-            <p><strong>Section:</strong> {{ table.section || 'General' }}</p>
+            <p><strong>Sức chứa:</strong> {{ table.capacity }} khách</p>
+            <p><strong>Khu vực:</strong> {{ table.section || 'Chung' }}</p>
+            <p v-if="table.occupied_since"><strong>Khách vào:</strong> {{ formatTime(table.occupied_since) }}</p>
+            <p v-if="table.ready_items_count"><strong>Món đã xong:</strong> {{ table.ready_items_count }}</p>
+            <p v-if="table.payment_requested_at" class="payment-alert">Khách đang gọi thanh toán</p>
           </div>
           <div class="table-actions">
-            <button @click="updateStatus(table.id, 'available')" class="btn-available">
-              Available
+            <button @click="updateStatus(table.id, 'empty')" class="btn-available">
+              Trống
             </button>
             <button @click="updateStatus(table.id, 'occupied')" class="btn-occupied">
-              Occupied
+              Có khách
             </button>
             <button @click="updateStatus(table.id, 'reserved')" class="btn-reserved">
-              Reserved
+              Đặt trước
             </button>
           </div>
         </div>
@@ -33,6 +36,7 @@
 import { ref, onMounted } from 'vue'
 import { useTableStore } from '@/stores/useTableStore'
 import MasterLayout from '@/components/MasterLayout.vue'
+import MasterPageHeader from '@/components/MasterPageHeader.vue'
 
 const tableStore = useTableStore()
 const tables = ref([])
@@ -47,22 +51,43 @@ async function updateStatus(tableId, status) {
     await tableStore.updateTableStatus(tableId, status)
     const table = tables.value.find(t => t.id === tableId)
     if (table) {
-      table.status = status
+      Object.assign(table, updatedTableShape(table, status))
     }
   } catch (err) {
     alert('Failed to update table status')
   }
+}
+
+function updatedTableShape(table, status) {
+  return {
+    status,
+    occupied_since: status === 'occupied' ? table.occupied_since || new Date().toISOString() : null,
+    current_customer_count: status === 'occupied' ? table.current_customer_count || 1 : 0,
+  }
+}
+
+function normalizedStatus(table) {
+  return table.status === 'empty' ? 'available' : table.status
+}
+
+function statusLabel(table) {
+  return {
+    empty: 'Trống',
+    available: 'Trống',
+    occupied: 'Có khách',
+    reserved: 'Đặt trước',
+    maintenance: 'Bảo trì',
+  }[table.status] || table.status
+}
+
+function formatTime(value) {
+  return value ? new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '-'
 }
 </script>
 
 <style scoped>
 .tables-view {
   padding: 20px;
-}
-
-h1 {
-  text-align: center;
-  margin-bottom: 30px;
 }
 
 .tables-list {
@@ -125,6 +150,16 @@ h1 {
 
 .table-info p {
   margin: 5px 0;
+}
+
+.payment-alert {
+  display: inline-flex;
+  margin-top: 8px !important;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: #fef3f2;
+  color: #b42318;
+  font-weight: 800;
 }
 
 .table-actions {

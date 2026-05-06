@@ -56,19 +56,11 @@
       <p v-if="error" class="error-text">{{ error }}</p>
 
       <button
-        class="role-btn admin-btn"
-        @click="handleRoleLogin('admin')"
+        class="login-btn"
+        @click="handleLogin"
         :disabled="loading"
       >
-        Quản lý
-      </button>
-
-      <button
-        class="role-btn customer-btn"
-        @click="handleRoleLogin('customer')"
-        :disabled="loading"
-      >
-        Khách hàng
+        {{ loading ? "Đang đăng nhập..." : "Đăng nhập" }}
       </button>
 
       <p class="register-text">
@@ -95,6 +87,39 @@ const rememberMe = ref(true);
 const showPassword = ref(false);
 const loading = ref(false);
 const error = ref("");
+
+const handleLogin = async () => {
+  error.value = "";
+
+  if (!email.value.trim() || !password.value.trim()) {
+    error.value = "Vui lòng nhập đầy đủ tài khoản và mật khẩu";
+    return;
+  }
+
+  try {
+    loading.value = true;
+
+    // Đăng nhập
+    await authStore.login({
+      email: email.value.trim(),
+      password: password.value.trim(),
+    });
+
+    if (rememberMe.value) {
+      localStorage.setItem("rememberEmail", email.value);
+    } else {
+      localStorage.removeItem("rememberEmail");
+    }
+
+    // Redirect dựa trên role
+    const defaultRoute = authStore.getDefaultRoute();
+    await router.push(defaultRoute);
+  } catch (err) {
+    error.value = err?.response?.data?.message || "Đăng nhập thất bại";
+  } finally {
+    loading.value = false;
+  }
+};
 
 const handleRoleLogin = async (role) => {
   error.value = "";

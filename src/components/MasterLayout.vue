@@ -1,12 +1,12 @@
 <template>
-  <div class="master-layout">
+  <div class="master-layout" :class="{ 'nav-vertical': appSettings.navLayout === 'side' }">
     <!-- Top Navbar -->
     <MasterNavbar />
 
     <!-- Main Content -->
-    <div class="layout-body">
+    <v-main class="layout-body">
       <slot></slot>
-    </div>
+    </v-main>
 
     <!-- Footer (Optional) -->
     <footer v-if="false" class="layout-footer">
@@ -41,6 +41,7 @@
 
 <script setup lang="ts">
 import MasterNavbar from './MasterNavbar.vue';
+import { appSettings } from '@/config/appSettings';
 
 interface Props {
   showFooter?: boolean;
@@ -63,6 +64,28 @@ withDefaults(defineProps<Props>(), {
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+
+.nav-vertical .layout-body {
+  padding-left: 88px;
+}
+
+.nav-vertical :deep(.master-page-header) {
+  width: auto;
+  margin-left: -24px;
+  margin-right: -24px;
+}
+
+@media (max-width: 960px) {
+  .nav-vertical .layout-body {
+    padding-left: 0;
+  }
+
+  .nav-vertical :deep(.master-page-header) {
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+  }
 }
 
 .layout-footer {

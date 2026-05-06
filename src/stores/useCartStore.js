@@ -15,10 +15,11 @@ export const useCartStore = defineStore('cart', () => {
     } else {
       items.value.push({
         food_id: food.id,
-        food_name: food.food_name,
+        food_name: food.name || food.food_name,
         price: food.price,
         quantity: quantity,
         category_id: food.category_id,
+        image_url: food.image_url,
       })
     }
   }
@@ -59,7 +60,7 @@ export const useCartStore = defineStore('cart', () => {
   }
 
   function setTable(table) {
-    tableId.value = table
+    tableId.value = table?.id || table
   }
 
   return {

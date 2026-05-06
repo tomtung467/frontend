@@ -1,7 +1,7 @@
 <template>
   <MasterLayout show-footer>
     <div class="floor-plan-view">
-      <h1>Floor Plan</h1>
+      <MasterPageHeader title="Sơ đồ bàn" />
       <div class="floor-plan">
         <div v-for="table in tables" :key="table.id" class="table-item" :class="table.status">
           <div class="table-number">{{ table.table_number }}</div>
@@ -24,6 +24,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTableStore } from '@/stores/useTableStore'
 import MasterLayout from '@/components/MasterLayout.vue'
+import MasterPageHeader from '@/components/MasterPageHeader.vue'
 
 const router = useRouter()
 const tableStore = useTableStore()
@@ -43,11 +44,6 @@ function selectTable(table) {
 <style scoped>
 .floor-plan-view {
   padding: 20px;
-}
-
-h1 {
-  text-align: center;
-  margin-bottom: 30px;
 }
 
 .floor-plan {

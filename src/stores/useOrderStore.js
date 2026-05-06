@@ -14,7 +14,7 @@ export const useOrderStore = defineStore('order', () => {
     try {
       const params = new URLSearchParams(filters)
       const response = await api.get(`/orders?${params.toString()}`)
-      orders.value = response.data
+      orders.value = response.data?.data?.data || response.data?.data || response.data
     } catch (err) {
       error.value = 'Failed to fetch orders'
       console.error(err)
@@ -28,9 +28,9 @@ export const useOrderStore = defineStore('order', () => {
     error.value = null
     try {
       const response = await api.post('/orders', data)
-      currentOrder.value = response.data
-      orders.value.push(response.data)
-      return response.data
+      currentOrder.value = response.data?.data || response.data
+      orders.value.push(currentOrder.value)
+      return currentOrder.value
     } catch (err) {
       error.value = 'Failed to create order'
       console.error(err)
@@ -44,15 +44,16 @@ export const useOrderStore = defineStore('order', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await api.put(`/orders/${orderId}`, { status })
+      const response = await api.put(`/orders/${orderId}/status`, { status })
+      const updated = response.data?.data || response.data
       const index = orders.value.findIndex(o => o.id === orderId)
       if (index !== -1) {
-        orders.value[index] = response.data
+        orders.value[index] = updated
       }
       if (currentOrder.value?.id === orderId) {
-        currentOrder.value = response.data
+        currentOrder.value = updated
       }
-      return response.data
+      return updated
     } catch (err) {
       error.value = 'Failed to update order'
       console.error(err)
@@ -65,12 +66,20 @@ export const useOrderStore = defineStore('order', () => {
   async function getOrderDetails(orderId) {
     try {
       const response = await api.get(`/orders/${orderId}`)
-      currentOrder.value = response.data
-      return response.data
+      currentOrder.value = response.data?.data || response.data
+      return currentOrder.value
     } catch (err) {
       error.value = 'Failed to fetch order details'
       throw err
     }
+  }
+
+  async function requestPayment(orderId) {
+    const response = await api.post(`/orders/${orderId}/request-payment`)
+    const updated = response.data?.data || response.data
+    const index = orders.value.findIndex(o => o.id === orderId)
+    if (index !== -1) orders.value[index] = updated
+    return updated
   }
 
   return {
@@ -82,5 +91,6 @@ export const useOrderStore = defineStore('order', () => {
     createOrder,
     updateOrderStatus,
     getOrderDetails,
+    requestPayment,
   }
 })

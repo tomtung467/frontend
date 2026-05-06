@@ -1,90 +1,151 @@
 <template>
-  <div class="menu-view">
-    <div class="container">
-      <h1>E-Menu</h1>
-      
-      <!-- Categories Filter -->
-      <div class="categories-filter">
-        <button
-          v-for="category in categories"
-          :key="category.id"
-          @click="selectCategory(category.id)"
-          :class="{ active: selectedCategory?.id === category.id }"
-          class="category-btn"
-        >
-          {{ category.name }}
-        </button>
+  <main class="customer-menu">
+    <section class="hero">
+      <button class="logout-button" @click="logout">Logout</button>
+      <div>
+        <p class="eyebrow">Restaurant E-Menu</p>
+        <h1>Eat in now or reserve ahead, then order whenever you are ready.</h1>
       </div>
-
-      <!-- Foods Grid -->
-      <div v-if="!loading" class="foods-grid">
-        <div v-for="food in foods" :key="food.id" class="food-card">
-          <div class="food-image">
-            <img :src="food.image_url || '/placeholder-food.jpg'" :alt="food.food_name" />
-          </div>
-          <div class="food-info">
-            <h3>{{ food.food_name }}</h3>
-            <p class="description">{{ food.description }}</p>
-            <div class="food-footer">
-              <span class="price">{{ formatPrice(food.price) }}</span>
-              <button @click="addToCart(food)" class="btn-add-to-cart">
-                Add to Cart
-              </button>
-            </div>
-          </div>
+      <div class="table-picker">
+        <div class="mode-switch">
+          <button :class="{ active: visitMode === 'dine_in' }" @click="visitMode = 'dine_in'">Eat now</button>
+          <button :class="{ active: visitMode === 'reservation' }" @click="visitMode = 'reservation'">Reserve</button>
         </div>
+        <label>Table</label>
+        <select v-model="selectedTableId" @change="cartStore.setTable(selectedTableId)">
+          <option value="">Select table</option>
+          <option v-for="table in tables" :key="table.id" :value="table.id">
+            Table {{ table.table_number || table.id }} - {{ table.capacity || 4 }} seats
+          </option>
+        </select>
       </div>
+    </section>
 
-      <!-- Loading State -->
-      <div v-else class="loading">
-        <p>Loading menu...</p>
-      </div>
+    <section class="customer-shell">
+      <aside class="reservation-panel">
+        <h2>{{ visitMode === 'dine_in' ? 'Dining at restaurant' : 'Reserve a table' }}</h2>
+        <p class="panel-copy">
+          {{ visitMode === 'dine_in' ? 'Select your table above, add dishes, then send the order to the kitchen.' : 'Book before arriving. Your table request will be saved for staff confirmation.' }}
+        </p>
+        <form v-if="visitMode === 'reservation'" @submit.prevent="reserveTable">
+          <input v-model="reservation.customer_name" required placeholder="Your name" />
+          <input v-model="reservation.customer_phone" required placeholder="Phone" />
+          <input v-model="reservation.customer_email" type="email" placeholder="Email" />
+          <input v-model="reservation.reservation_time" required type="datetime-local" />
+          <input v-model.number="reservation.number_of_guests" required type="number" min="1" placeholder="Guests" />
+          <textarea v-model="reservation.special_requests" placeholder="Special requests"></textarea>
+          <button :disabled="reservationSaving">{{ reservationSaving ? 'Saving...' : 'Book table' }}</button>
+        </form>
+        <div v-else class="walk-in-card">
+          <strong>{{ selectedTableId ? `Table ${selectedTableId}` : 'No table selected' }}</strong>
+          <span>{{ selectedTableId ? 'Ready for ordering.' : 'Choose a table from the selector.' }}</span>
+        </div>
+        <p v-if="reservationMessage" class="message">{{ reservationMessage }}</p>
+      </aside>
 
-      <!-- Error State -->
-      <div v-if="error" class="error">
-        {{ error }}
+      <section class="menu-content">
+        <div class="categories-filter">
+          <button
+            v-for="category in categories"
+            :key="category.id"
+            @click="selectCategory(category)"
+            :class="{ active: selectedCategory?.id === category.id }"
+          >
+            {{ category.name }}
+          </button>
+        </div>
+
+        <p v-if="error" class="state error">{{ error }}</p>
+        <p v-else-if="loading" class="state">Loading menu...</p>
+        <div v-else class="foods-grid">
+          <article v-for="food in foods" :key="food.id" class="food-card">
+            <img :src="food.image_url || fallbackImage(food)" :alt="food.name || food.food_name" />
+            <div class="food-info">
+              <div>
+                <h3>{{ food.name || food.food_name }}</h3>
+                <p>{{ food.description || 'Freshly prepared by the kitchen.' }}</p>
+              </div>
+              <div class="food-footer">
+                <strong>{{ formatPrice(food.price) }}</strong>
+                <button @click="addToCart(food)">Add</button>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </section>
+
+    <div class="floating-cart">
+      <div>
+        <strong>{{ cartStore.itemCount }} items</strong>
+        <span>{{ formatPrice(cartStore.totalPrice) }}</span>
       </div>
+      <router-link to="/cart">View cart</router-link>
     </div>
-  </div>
+  </main>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
+import api from '@/api'
 import { useMenuStore } from '@/stores/useMenuStore'
 import { useCartStore } from '@/stores/useCartStore'
+import { useTableStore } from '@/stores/useTableStore'
+import { useAuthStore } from '@/stores/useAuthStore'
+import { useRouter } from 'vue-router'
 
 const menuStore = useMenuStore()
 const cartStore = useCartStore()
+const tableStore = useTableStore()
+const authStore = useAuthStore()
+const router = useRouter()
 
 const categories = ref([])
 const foods = ref([])
+const tables = ref([])
 const selectedCategory = ref(null)
+const selectedTableId = ref(cartStore.tableId || '')
+const visitMode = ref('dine_in')
 const loading = ref(false)
-const error = ref(null)
+const error = ref('')
+const reservationSaving = ref(false)
+const reservationMessage = ref('')
+
+const reservation = reactive({
+  table_id: '',
+  customer_name: '',
+  customer_phone: '',
+  customer_email: '',
+  reservation_time: '',
+  number_of_guests: 2,
+  special_requests: '',
+})
 
 onMounted(async () => {
   loading.value = true
   try {
-    await menuStore.fetchCategories()
+    await Promise.all([menuStore.fetchCategories(), tableStore.fetchTables()])
     categories.value = menuStore.categories
+    tables.value = tableStore.tables
     if (categories.value.length > 0) {
-      await selectCategory(categories.value[0].id)
+      await selectCategory(categories.value[0])
     }
   } catch (err) {
-    error.value = 'Failed to load menu'
+    error.value = 'Failed to load menu.'
   } finally {
     loading.value = false
   }
 })
 
-async function selectCategory(categoryId) {
+async function selectCategory(category) {
   loading.value = true
+  error.value = ''
   try {
-    await menuStore.fetchCategoryFoods(categoryId)
+    await menuStore.fetchCategoryFoods(category.id)
     foods.value = menuStore.foods
-    selectedCategory.value = menuStore.selectedCategory
+    selectedCategory.value = category
   } catch (err) {
-    error.value = 'Failed to load foods'
+    error.value = 'Failed to load dishes.'
   } finally {
     loading.value = false
   }
@@ -92,151 +153,94 @@ async function selectCategory(categoryId) {
 
 function addToCart(food) {
   cartStore.addItem(food)
-  alert(`${food.food_name} added to cart!`)
+}
+
+async function logout() {
+  await authStore.logout()
+  router.push('/login')
+}
+
+async function reserveTable() {
+  const tableId = reservation.table_id || selectedTableId.value
+  if (!tableId) {
+    reservationMessage.value = 'Please select a table first.'
+    return
+  }
+  reservationSaving.value = true
+  reservationMessage.value = ''
+  try {
+    const reservationTime = reservation.reservation_time.replace('T', ' ') + ':00'
+    await api.post('/reservations', { ...reservation, table_id: tableId, reservation_time: reservationTime })
+    reservationMessage.value = 'Reservation request saved.'
+    Object.assign(reservation, {
+      table_id: '',
+      customer_name: '',
+      customer_phone: '',
+      customer_email: '',
+      reservation_time: '',
+      number_of_guests: 2,
+      special_requests: '',
+    })
+  } catch (err) {
+    reservationMessage.value = err.response?.data?.message || 'Reservation failed.'
+  } finally {
+    reservationSaving.value = false
+  }
+}
+
+function fallbackImage(food) {
+  const label = encodeURIComponent(food.name || food.food_name || 'Dish')
+  return `https://placehold.co/640x420/f3f4f6/344054?text=${label}`
 }
 
 function formatPrice(price) {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-  }).format(price)
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(price || 0))
 }
 </script>
 
 <style scoped>
-.menu-view {
-  padding: 20px;
-  background-color: #f5f5f5;
-  min-height: 100vh;
-}
-
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-h1 {
-  text-align: center;
-  margin-bottom: 30px;
-  color: #333;
-}
-
-.categories-filter {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 30px;
-  overflow-x: auto;
-  padding: 10px 0;
-}
-
-.category-btn {
-  padding: 10px 20px;
-  border: 2px solid #ddd;
-  background: white;
-  cursor: pointer;
-  border-radius: 20px;
-  font-size: 14px;
-  white-space: nowrap;
-  transition: all 0.3s;
-}
-
-.category-btn:hover {
-  border-color: #ff6b35;
-}
-
-.category-btn.active {
-  background-color: #ff6b35;
-  color: white;
-  border-color: #ff6b35;
-}
-
-.foods-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
-}
-
-.food-card {
-  background: white;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s;
-}
-
-.food-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.food-image {
-  width: 100%;
-  height: 200px;
-  overflow: hidden;
-  background-color: #f0f0f0;
-}
-
-.food-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.food-info {
-  padding: 15px;
-}
-
-.food-info h3 {
-  margin: 0 0 10px 0;
-  color: #333;
-  font-size: 16px;
-}
-
-.description {
-  color: #666;
-  font-size: 13px;
-  margin-bottom: 15px;
-  line-height: 1.4;
-}
-
-.food-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.price {
-  font-weight: bold;
-  color: #ff6b35;
-  font-size: 16px;
-}
-
-.btn-add-to-cart {
-  background-color: #ff6b35;
-  color: white;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: background-color 0.3s;
-}
-
-.btn-add-to-cart:hover {
-  background-color: #e55a25;
-}
-
-.loading,
-.error {
-  text-align: center;
-  padding: 40px;
-  font-size: 16px;
-}
-
-.error {
-  color: #d32f2f;
-  background-color: #ffebee;
-  border-radius: 8px;
+.customer-menu { min-height: 100vh; background: #f7f4ee; color: #1f2937; padding-bottom: 92px; }
+.hero { min-height: 260px; background: linear-gradient(rgba(18, 26, 37, .58), rgba(18, 26, 37, .58)), url('https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1600&q=80') center/cover; color: #fff; padding: 42px clamp(18px, 5vw, 72px); display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; position: relative; }
+.logout-button { position: absolute; top: 18px; right: 18px; min-height: 38px; border: 1px solid rgba(255,255,255,.45); border-radius: 7px; background: rgba(17,24,39,.55); color: #fff; padding: 0 14px; cursor: pointer; font-weight: 800; }
+.eyebrow { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0; color: rgba(255,255,255,.8); }
+h1 { margin: 0; max-width: 760px; font-size: clamp(34px, 5vw, 64px); line-height: 1.02; }
+.table-picker { background: rgba(255,255,255,.95); color: #111827; border-radius: 8px; padding: 14px; min-width: 260px; }
+.mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+.mode-switch button { min-height: 36px; border: 1px solid #d0d5dd; border-radius: 7px; background: #fff; cursor: pointer; font-weight: 700; }
+.mode-switch button.active { background: #111827; color: #fff; border-color: #111827; }
+.table-picker label { display: block; font-size: 12px; color: #667085; margin-bottom: 6px; }
+select, input, textarea { width: 100%; min-height: 40px; border: 1px solid #d0d5dd; border-radius: 7px; padding: 0 10px; background: #fff; }
+textarea { min-height: 76px; padding-top: 10px; resize: vertical; }
+.customer-shell { display: grid; grid-template-columns: 310px 1fr; gap: 22px; width: min(1360px, calc(100% - 36px)); margin: -34px auto 0; position: relative; }
+.reservation-panel, .food-card, .state { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 12px 34px rgba(16,24,40,.08); }
+.reservation-panel { padding: 18px; align-self: start; }
+.reservation-panel h2 { margin: 0 0 14px; font-size: 20px; }
+.panel-copy { color: #667085; margin: -4px 0 14px; font-size: 14px; line-height: 1.45; }
+.reservation-panel form { display: grid; gap: 10px; }
+.walk-in-card { display: grid; gap: 4px; padding: 14px; border: 1px dashed #d0d5dd; border-radius: 8px; background: #f9fafb; }
+.walk-in-card span { color: #667085; }
+.reservation-panel button, .food-footer button, .floating-cart a { min-height: 40px; border: 0; border-radius: 7px; background: #c2410c; color: #fff; padding: 0 14px; font-weight: 800; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+.message { margin: 12px 0 0; color: #475467; font-size: 13px; }
+.menu-content { min-width: 0; }
+.categories-filter { display: flex; gap: 10px; overflow-x: auto; padding: 0 0 14px; }
+.categories-filter button { min-height: 40px; border: 1px solid #e5e7eb; background: #fff; border-radius: 999px; padding: 0 16px; white-space: nowrap; cursor: pointer; color: #344054; }
+.categories-filter button.active { background: #1f2937; color: #fff; border-color: #1f2937; }
+.foods-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 18px; }
+.food-card { overflow: hidden; display: flex; flex-direction: column; min-height: 390px; }
+.food-card img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #f2f4f7; }
+.food-info { padding: 15px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; flex: 1; }
+.food-info h3 { margin: 0 0 8px; font-size: 18px; }
+.food-info p { margin: 0; color: #667085; font-size: 14px; line-height: 1.45; }
+.food-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.food-footer strong { color: #9a3412; }
+.state { padding: 18px; color: #475467; }
+.state.error { color: #b42318; border-color: #fecdca; background: #fffbfa; }
+.floating-cart { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(520px, calc(100% - 28px)); background: #111827; color: #fff; border-radius: 8px; padding: 12px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 14px 42px rgba(16,24,40,.3); z-index: 50; }
+.floating-cart span { display: block; color: rgba(255,255,255,.72); font-size: 13px; margin-top: 2px; }
+.floating-cart a { background: #fff; color: #111827; }
+@media (max-width: 900px) {
+  .hero { align-items: flex-start; flex-direction: column; }
+  .table-picker { width: 100%; }
+  .customer-shell { grid-template-columns: 1fr; margin-top: 18px; }
 }
 </style>

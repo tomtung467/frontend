@@ -1,7 +1,7 @@
 <template>
   <MasterLayout show-footer>
     <div class="departments-view">
-      <h1>Department Management</h1>
+      <MasterPageHeader title="Phòng ban" />
       <div class="departments-list">
         <div v-for="department in departments" :key="department.id" class="department-card">
           <h3>{{ department.name }}</h3>
@@ -16,6 +16,7 @@
 import { ref, onMounted } from 'vue'
 import api from '@/api'
 import MasterLayout from '@/components/MasterLayout.vue'
+import MasterPageHeader from '@/components/MasterPageHeader.vue'
 
 const departments = ref([])
 
@@ -32,11 +33,6 @@ onMounted(async () => {
 <style scoped>
 .departments-view {
   padding: 20px;
-}
-
-h1 {
-  text-align: center;
-  margin-bottom: 30px;
 }
 
 .departments-list {

@@ -1,123 +1,89 @@
 <template>
-  <div class="kitchen-display-view">
-    <div class="kitchen-header">
-      <h1>Kitchen Display System</h1>
-      <button @click="refreshQueue" class="btn-refresh">Refresh Queue</button>
-    </div>
+  <MasterLayout>
+    <main class="kitchen-page">
+      <MasterPageHeader title="Bảng bếp">
+        <template #actions>
+          <router-link class="ghost-action" to="/kitchen/queue">Queue list</router-link>
+          <button @click="refreshQueue" class="primary-action">Refresh Queue</button>
+        </template>
+      </MasterPageHeader>
 
-    <div class="kitchen-content">
-      <!-- Kanban Board Columns -->
-      <div class="kanban-board">
-        <div class="kanban-column pending">
-          <h2>Pending <span class="count">{{ pendingOrders.length }}</span></h2>
-          <div v-for="order in pendingOrders" :key="order.id" class="order-card">
-            <div class="order-number">Order #{{ order.id }}</div>
+      <p v-if="kitchenStore.error" class="state error">{{ kitchenStore.error }}</p>
+      <p v-else-if="kitchenStore.loading" class="state">Loading queue...</p>
+
+      <section class="kanban-board">
+        <article v-for="column in columns" :key="column.key" class="kanban-column" :class="column.key">
+          <header>
+            <h2>{{ column.label }}</h2>
+            <span>{{ ordersByStatus(column.statuses).length }}</span>
+          </header>
+
+          <div v-if="ordersByStatus(column.statuses).length === 0" class="empty-column">
+            No active tickets
+          </div>
+
+          <div v-for="order in ordersByStatus(column.statuses)" :key="order.id" class="order-card">
+            <div class="order-topline">
+              <strong>{{ order.order_number || `Order #${order.id}` }}</strong>
+              <span>Table {{ order.table_id }}</span>
+            </div>
+            <div v-if="column.key === 'cooking'" class="timer">{{ getTimer(order) }}</div>
             <div class="order-items">
-              <div v-for="item in order.orderItems" :key="item.id" class="item">
+              <div v-for="item in orderItems(order)" :key="item.id" class="item">
                 <span class="qty">{{ item.quantity }}x</span>
-                <span class="name">{{ item.food_name }}</span>
+                <span>{{ item.food?.name || item.food_name || item.name || `Food #${item.food_id}` }}</span>
               </div>
             </div>
-            <button @click="updateStatus(order.id, 'cooking')" class="btn-action">
-              Start Cooking
+            <p v-if="order.customer_notes || order.special_requests" class="notes">
+              {{ order.customer_notes || order.special_requests }}
+            </p>
+            <button v-if="column.next" class="ticket-action" @click="updateStatus(order.id, column.next.status)">
+              {{ column.next.label }}
+            </button>
+            <button v-else class="ticket-action done" @click="completeOrder(order.id)">
+              Mark served
             </button>
           </div>
-        </div>
-
-        <div class="kanban-column cooking">
-          <h2>Cooking <span class="count">{{ cookingOrders.length }}</span></h2>
-          <div v-for="order in cookingOrders" :key="order.id" class="order-card">
-            <div class="order-number">Order #{{ order.id }}</div>
-            <div class="timer">{{ getTimer(order.id) }}</div>
-            <div class="order-items">
-              <div v-for="item in order.orderItems" :key="item.id" class="item">
-                <span class="qty">{{ item.quantity }}x</span>
-                <span class="name">{{ item.food_name }}</span>
-              </div>
-            </div>
-            <button @click="updateStatus(order.id, 'ready')" class="btn-action">
-              Ready to Serve
-            </button>
-          </div>
-        </div>
-
-        <div class="kanban-column ready">
-          <h2>Ready <span class="count">{{ readyOrders.length }}</span></h2>
-          <div v-for="order in readyOrders" :key="order.id" class="order-card">
-            <div class="order-number">Order #{{ order.id }}</div>
-            <div class="table-info">Table {{ order.table_id }}</div>
-            <div class="order-items">
-              <div v-for="item in order.orderItems" :key="item.id" class="item">
-                <span class="qty">{{ item.quantity }}x</span>
-                <span class="name">{{ item.food_name }}</span>
-              </div>
-            </div>
-            <button @click="printOrder(order.id)" class="btn-print">
-              Print Receipt
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+        </article>
+      </section>
+    </main>
+  </MasterLayout>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import MasterLayout from '@/components/MasterLayout.vue'
+import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { useKitchenStore } from '@/stores/useKitchenStore'
 
 const kitchenStore = useKitchenStore()
-const timers = ref({})
+const now = ref(Date.now())
 let refreshInterval
+let timerInterval
 
-const pendingOrders = computed(() => 
-  kitchenStore.queue.filter(o => o.status === 'pending')
-)
-const cookingOrders = computed(() => 
-  kitchenStore.queue.filter(o => o.status === 'cooking')
-)
-const readyOrders = computed(() => 
-  kitchenStore.queue.filter(o => o.status === 'ready')
-)
+const columns = [
+  { key: 'pending', label: 'Pending', statuses: ['pending', 'confirmed'], next: { status: 'in_progress', label: 'Start cooking' } },
+  { key: 'cooking', label: 'Cooking', statuses: ['in_progress'], next: { status: 'ready', label: 'Ready to serve' } },
+  { key: 'ready', label: 'Ready', statuses: ['ready'], next: null },
+]
 
 onMounted(async () => {
   await kitchenStore.fetchQueue()
-  
-  // Auto refresh every 5 seconds
-  refreshInterval = setInterval(() => {
-    kitchenStore.fetchQueue()
-  }, 5000)
-
-  // Start timers for cooking orders
-  startTimers()
+  refreshInterval = setInterval(() => kitchenStore.fetchQueue(), 5000)
+  timerInterval = setInterval(() => { now.value = Date.now() }, 1000)
 })
 
 onUnmounted(() => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval)
-  }
+  clearInterval(refreshInterval)
+  clearInterval(timerInterval)
 })
 
-function startTimers() {
-  cookingOrders.value.forEach(order => {
-    if (!timers.value[order.id]) {
-      const startTime = new Date(order.updated_at).getTime()
-      timers.value[order.id] = 0
-      
-      const timerInterval = setInterval(() => {
-        timers.value[order.id] = Math.floor(
-          (new Date().getTime() - startTime) / 1000
-        )
-      }, 1000)
-    }
-  })
+function ordersByStatus(statuses) {
+  return kitchenStore.queue.filter((order) => statuses.includes(order.status))
 }
 
-function getTimer(orderId) {
-  const seconds = timers.value[orderId] || 0
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${mins}:${secs.toString().padStart(2, '0')}`
+function orderItems(order) {
+  return order.order_items || order.orderItems || order.items || []
 }
 
 async function refreshQueue() {
@@ -125,203 +91,50 @@ async function refreshQueue() {
 }
 
 async function updateStatus(orderId, status) {
-  try {
-    await kitchenStore.updateOrderStatus(orderId, status)
-    if (status === 'cooking') {
-      startTimers()
-    }
-  } catch (err) {
-    console.error('Failed to update order status:', err)
-  }
+  await kitchenStore.updateOrderStatus(orderId, status)
+  await kitchenStore.fetchQueue()
 }
 
-async function printOrder(orderId) {
-  try {
-    await kitchenStore.printOrder(orderId)
-    alert('Order sent to printer')
-  } catch (err) {
-    console.error('Failed to print order:', err)
-  }
+async function completeOrder(orderId) {
+  await kitchenStore.completeOrder(orderId)
+  await kitchenStore.fetchQueue()
+}
+
+function getTimer(order) {
+  const start = new Date(order.updated_at || order.created_at).getTime()
+  const seconds = Math.max(0, Math.floor((now.value - start) / 1000))
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 </script>
 
 <style scoped>
-.kitchen-display-view {
-  height: 100vh;
-  background-color: #f5f5f5;
-  display: flex;
-  flex-direction: column;
-}
-
-.kitchen-header {
-  background: white;
-  padding: 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.kitchen-header h1 {
-  margin: 0;
-  color: #333;
-}
-
-.btn-refresh {
-  background-color: #ff6b35;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.btn-refresh:hover {
-  background-color: #e55a25;
-}
-
-.kitchen-content {
-  flex: 1;
-  overflow: auto;
-  padding: 20px;
-}
-
-.kanban-board {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-  gap: 20px;
-  height: 100%;
-}
-
-.kanban-column {
-  background: white;
-  border-radius: 8px;
-  padding: 15px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-}
-
-.kanban-column h2 {
-  margin: 0 0 15px 0;
-  font-size: 18px;
-  padding-bottom: 10px;
-  border-bottom: 3px solid #ff6b35;
-}
-
-.kanban-column.pending h2 {
-  border-bottom-color: #ff9800;
-}
-
-.kanban-column.cooking h2 {
-  border-bottom-color: #f44336;
-}
-
-.kanban-column.ready h2 {
-  border-bottom-color: #4caf50;
-}
-
-.count {
-  background-color: #ff6b35;
-  color: white;
-  border-radius: 20px;
-  padding: 2px 8px;
-  font-size: 12px;
-  margin-left: 10px;
-}
-
-.order-card {
-  background: #f9f9f9;
-  border: 2px solid #ddd;
-  border-radius: 6px;
-  padding: 12px;
-  margin-bottom: 12px;
-  cursor: grab;
-}
-
-.order-card:hover {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-.order-number {
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 8px;
-  font-size: 16px;
-}
-
-.timer {
-  background: #ffebee;
-  color: #d32f2f;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-weight: bold;
-  display: inline-block;
-  margin-bottom: 8px;
-  font-size: 14px;
-}
-
-.table-info {
-  background: #e3f2fd;
-  color: #1976d2;
-  padding: 4px 8px;
-  border-radius: 4px;
-  display: inline-block;
-  margin-bottom: 8px;
-  font-size: 12px;
-  font-weight: bold;
-}
-
-.order-items {
-  background: white;
-  padding: 10px;
-  border-radius: 4px;
-  margin-bottom: 10px;
-  border-left: 3px solid #ff6b35;
-}
-
-.item {
-  display: flex;
-  gap: 8px;
-  padding: 5px 0;
-  font-size: 14px;
-  color: #333;
-}
-
-.qty {
-  font-weight: bold;
-  color: #ff6b35;
-  min-width: 30px;
-}
-
-.btn-action,
-.btn-print {
-  width: 100%;
-  padding: 8px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
-  font-size: 12px;
-  transition: background-color 0.3s;
-}
-
-.btn-action {
-  background-color: #4caf50;
-  color: white;
-}
-
-.btn-action:hover {
-  background-color: #388e3c;
-}
-
-.btn-print {
-  background-color: #2196f3;
-  color: white;
-}
-
-.btn-print:hover {
-  background-color: #1976d2;
+.kitchen-page { min-height: calc(100vh - 48px); background: #f5f7fb; padding: 24px; }
+button, .ghost-action { border: 0; border-radius: 7px; min-height: 40px; padding: 0 14px; display: inline-flex; align-items: center; text-decoration: none; cursor: pointer; font-weight: 700; }
+.primary-action { background: #ff6333; color: #fff; }
+.ghost-action { background: #fff; color: #344054; border: 1px solid #d0d5dd; }
+.state { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+.state.error { color: #b42318; background: #fffbfa; border-color: #fecdca; }
+.kanban-board { display: grid; grid-template-columns: repeat(3, minmax(280px, 1fr)); gap: 18px; min-height: calc(100vh - 170px); }
+.kanban-column { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; box-shadow: 0 2px 8px rgba(16,24,40,.08); }
+.kanban-column header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 3px solid #ff9800; }
+.kanban-column.cooking header { border-bottom-color: #ef4444; }
+.kanban-column.ready header { border-bottom-color: #22c55e; }
+h2 { margin: 0; font-size: 20px; color: #111827; }
+header span { background: #ff6333; color: #fff; border-radius: 999px; min-width: 30px; height: 26px; display: inline-grid; place-items: center; font-weight: 800; }
+.empty-column { margin-top: 18px; color: #98a2b3; text-align: center; padding: 34px 10px; border: 1px dashed #d0d5dd; border-radius: 8px; }
+.order-card { margin-top: 14px; background: #f9fafb; border: 1px solid #d0d5dd; border-left: 5px solid #ff6333; border-radius: 8px; padding: 14px; }
+.order-topline { display: flex; justify-content: space-between; gap: 10px; color: #111827; }
+.order-topline span { color: #475467; font-size: 13px; }
+.timer { display: inline-block; margin-top: 8px; padding: 4px 8px; background: #fef3f2; color: #b42318; border-radius: 6px; font-weight: 800; }
+.order-items { background: #fff; border-radius: 6px; padding: 10px; margin: 12px 0; }
+.item { display: flex; gap: 8px; padding: 5px 0; color: #344054; }
+.qty { min-width: 34px; color: #ff6333; font-weight: 800; }
+.notes { margin: 0 0 12px; color: #475467; font-size: 13px; }
+.ticket-action { width: 100%; justify-content: center; background: #16a34a; color: #fff; }
+.ticket-action.done { background: #155eef; }
+@media (max-width: 980px) {
+  .kanban-board { grid-template-columns: 1fr; }
 }
 </style>

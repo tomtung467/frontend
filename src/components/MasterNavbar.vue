@@ -1,163 +1,98 @@
 <template>
-  <v-app-bar elevation="4" :color="appBarColor" class="master-navbar" density="compact">
+  <aside v-if="appSettings.navLayout === 'side' && !smAndDown" class="side-navbar">
+    <button class="side-brand" @click="goHome">
+      <v-icon size="28">mdi-silverware-fork-knife</v-icon>
+    </button>
+
+    <nav class="side-menu">
+      <v-tooltip v-for="item in visibleNavItems" :key="item.key" :text="item.label" location="end">
+        <template #activator="{ props }">
+          <button
+            v-bind="props"
+            class="side-nav-btn"
+            :class="{ active: route.path === item.path }"
+            @click="router.push(item.path)"
+          >
+            <v-icon size="25">{{ item.icon }}</v-icon>
+          </button>
+        </template>
+      </v-tooltip>
+    </nav>
+
+    <div class="side-bottom">
+      <button class="side-nav-btn" @click="router.push('/settings')">
+        <v-icon size="25">mdi-cog</v-icon>
+      </button>
+    </div>
+  </aside>
+
+  <v-app-bar v-else elevation="2" color="primary" class="master-navbar" density="compact">
     <div class="navbar-wrapper">
-      <!-- Logo & Brand -->
       <v-toolbar-title class="navbar-brand" @click="goHome">
-        <div class="brand-logo">
-          <span class="logo-icon">🍽️</span>
-          <span class="brand-name">RestaurantApp</span>
-        </div>
+        <v-icon size="24">mdi-silverware-fork-knife</v-icon>
+        <span class="brand-name">RestaurantApp</span>
       </v-toolbar-title>
 
-      <!-- Navigation Menu - Icon Based with Tooltips -->
-      <div class="navbar-menu" v-if="!smAndDown">
-        <!-- Dashboard -->
-        <v-tooltip text="Dashboard" location="bottom">
-          <template v-slot:activator="{ props }">
-            <v-btn v-bind="props" icon variant="text" size="small" @click="navigateTo('dashboard')" class="menu-icon-btn">
-              <v-icon size="24">mdi-chart-box</v-icon>
-            </v-btn>
-          </template>
-        </v-tooltip>
-
-        <!-- Management Dropdown -->
-        <v-menu offset-y open-on-hover>
-          <template v-slot:activator="{ props }">
-            <v-tooltip text="Quản lý" location="bottom">
-              <template v-slot:activator="{ props: tooltipProps }">
-                <v-btn v-bind="mergeProps(props, tooltipProps)" icon variant="text" size="small" class="menu-icon-btn">
-                  <v-icon size="24">mdi-toolbox</v-icon>
-                  <v-icon end size="16">mdi-chevron-down</v-icon>
-                </v-btn>
-              </template>
-            </v-tooltip>
-          </template>
-          <v-list density="compact" nav min-width="200">
-            <v-list-item @click="navigateTo('orders')" prepend-icon="mdi-clipboard-list">
-              <v-list-item-title>Quản lý đơn hàng</v-list-item-title>
-            </v-list-item>
-            <v-list-item  @click="navigateTo('menu')" prepend-icon="mdi-food">
-              <v-list-item-title>Quản lý menu</v-list-item-title>
-            </v-list-item>
-            <v-list-item @click="navigateTo('tables')" prepend-icon="mdi-table-furniture">
-              <v-list-item-title>Quản lý bàn</v-list-item-title>
-            </v-list-item>
-            <v-list-item  @click="navigateTo('inventory')" prepend-icon="mdi-package-variant">
-              <v-list-item-title>Quản lý kho</v-list-item-title>
-            </v-list-item>
-            <v-list-item @click="navigateTo('employees')" prepend-icon="mdi-account-group">
-              <v-list-item-title>Quản lý nhân viên</v-list-item-title>
-            </v-list-item>
-          </v-list>
-        </v-menu>
-
-        <!-- Reports -->
-        <v-tooltip text="Báo cáo" location="bottom">
-          <template v-slot:activator="{ props }">
-            <v-btn v-bind="props" icon variant="text" size="small" @click="navigateTo('reports')" class="menu-icon-btn">
-              <v-icon size="24">mdi-chart-line</v-icon>
+      <div v-if="!smAndDown" class="navbar-menu">
+        <v-tooltip v-for="item in visibleNavItems" :key="item.key" :text="item.label" location="bottom">
+          <template #activator="{ props }">
+            <v-btn
+              v-bind="props"
+              icon
+              variant="text"
+              size="small"
+              class="menu-icon-btn"
+              :class="{ active: route.path === item.path }"
+              @click="router.push(item.path)"
+            >
+              <v-icon size="23">{{ item.icon }}</v-icon>
             </v-btn>
           </template>
         </v-tooltip>
       </div>
 
-      <!-- Mobile Menu -->
       <v-menu v-else offset-y>
         <template #activator="{ props }">
           <v-btn v-bind="props" icon size="small" class="menu-icon-btn">
             <v-icon size="24">mdi-menu</v-icon>
           </v-btn>
         </template>
-        <v-list density="compact">
-          <v-list-item @click="navigateTo('dashboard')" prepend-icon="mdi-chart-box">
-            <v-list-item-title>Dashboard</v-list-item-title>
-          </v-list-item>
-          <v-divider></v-divider>
-          <v-list-item prepend-icon="mdi-toolbox" @click="managementOpen = !managementOpen">
-            <v-list-item-title>Quản lý</v-list-item-title>
-            <template #append>
-              <v-icon :class="{ 'rotate-180': managementOpen }">mdi-chevron-down</v-icon>
-            </template>
-          </v-list-item>
-          <v-list v-if="managementOpen" density="compact" class="pl-4">
-            <v-list-item @click="navigateTo('orders')" prepend-icon="mdi-clipboard-list">
-              <v-list-item-title>Quản lý đơn hàng</v-list-item-title>
-            </v-list-item>
-            <v-list-item @click="navigateTo('menu')" prepend-icon="mdi-food">
-              <v-list-item-title>Quản lý menu</v-list-item-title>
-            </v-list-item>
-            <v-list-item @click="navigateTo('tables')" prepend-icon="mdi-table-furniture">
-              <v-list-item-title>Quản lý bàn</v-list-item-title>
-            </v-list-item>
-            <v-list-item @click="navigateTo('inventory')" prepend-icon="mdi-package-variant">
-              <v-list-item-title>Quản lý kho</v-list-item-title>
-            </v-list-item>
-            <v-list-item @click="navigateTo('employees')" prepend-icon="mdi-account-group">
-              <v-list-item-title>Quản lý nhân viên</v-list-item-title>
-            </v-list-item>
-          </v-list>
-          <v-divider></v-divider>
-          <v-list-item  @click="navigateTo('reports')" prepend-icon="mdi-chart-line">
-            <v-list-item-title>Báo cáo</v-list-item-title>
+        <v-list density="compact" min-width="230">
+          <v-list-item
+            v-for="item in visibleNavItems"
+            :key="item.key"
+            :prepend-icon="item.icon"
+            @click="router.push(item.path)"
+          >
+            <v-list-item-title>{{ item.label }}</v-list-item-title>
           </v-list-item>
         </v-list>
       </v-menu>
 
-      <v-spacer></v-spacer>
+      <v-spacer />
 
-      <!-- Right Side Actions - Icon Based -->
       <div class="navbar-actions">
-        <!-- Search -->
-        <div class="search-container">
-          <v-tooltip text="Tìm kiếm" location="bottom">
-            <template v-slot:activator="{ props }">
-              <v-btn v-bind="props" icon size="small" class="action-icon-btn" @click="searchExpanded = !searchExpanded">
-                <v-icon>mdi-magnify</v-icon>
-              </v-btn>
-            </template>
-          </v-tooltip>
-          <v-text-field
-            v-if="searchExpanded"
-            v-model="searchQuery"
-            @keyup.enter="handleSearch"
-            @blur="searchExpanded = false"
-            placeholder="Tìm kiếm..."
-            density="compact"
-            variant="outlined"
-            hide-details
-            class="search-field expanded"
-            autofocus
-          ></v-text-field>
-        </div>
-
-        <!-- Notifications -->
-        <v-menu offset-y open-on-hover>
-          <template v-slot:activator="{ props }">
-            <v-tooltip text="Thông báo" location="bottom">
-              <template v-slot:activator="{ props: tooltipProps }">
-                <v-btn v-bind="mergeProps(props, tooltipProps)" icon size="small" class="action-icon-btn">
-                  <v-badge :content="notificationCount" :model-value="notificationCount > 0" color="error" overlap dot>
-                    <v-icon>mdi-bell</v-icon>
-                  </v-badge>
-                </v-btn>
-              </template>
-            </v-tooltip>
+        <v-tooltip text="Search" location="bottom">
+          <template #activator="{ props }">
+            <v-btn v-bind="props" icon size="small" class="action-icon-btn" @click="searchExpanded = !searchExpanded">
+              <v-icon>mdi-magnify</v-icon>
+            </v-btn>
           </template>
-          <v-list width="350" max-height="400" class="overflow-y-auto">
-            <v-list-item v-if="notificationCount === 0" disabled>
-              <v-list-item-title class="text-center">Không có thông báo</v-list-item-title>
-            </v-list-item>
-            <div v-else>
-              <v-list-item-title class="px-4 py-2">
-                <strong>Bạn có {{ notificationCount }} thông báo mới</strong>
-              </v-list-item-title>
-              <v-divider></v-divider>
-            </div>
-          </v-list>
-        </v-menu>
+        </v-tooltip>
+        <v-text-field
+          v-if="searchExpanded"
+          v-model="searchQuery"
+          @keyup.enter="handleSearch"
+          @blur="searchExpanded = false"
+          placeholder="Search"
+          density="compact"
+          variant="outlined"
+          hide-details
+          class="search-field"
+          autofocus
+        />
 
-        <!-- User Menu -->
-        <v-divider :thickness="2" vertical class="mx-2" style="opacity: 0.3"></v-divider>
+        <v-divider vertical class="mx-2 opacity-50" />
         <MenuUser v-if="authStore.user" :user="authStore.user" @logout="handleLogout" />
       </div>
     </div>
@@ -165,94 +100,49 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useAuthStore } from '@/stores/useAuthStore';
-import { useRouter } from 'vue-router';
-import { useDisplay } from 'vuetify';
-import MenuUser from './MenuUser.vue';
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useDisplay } from 'vuetify'
+import { useAuthStore } from '@/stores/useAuthStore'
+import { getVisibleNavItems } from '@/config/permissions'
+import { appSettings } from '@/config/appSettings'
+import MenuUser from './MenuUser.vue'
 
-const authStore = useAuthStore();
-const router = useRouter();
-const { smAndDown } = useDisplay();
+const authStore = useAuthStore()
+const router = useRouter()
+const route = useRoute()
+const { smAndDown } = useDisplay()
 
-const searchQuery = ref('');
-const notificationCount = ref(3);
-const searchExpanded = ref(false);
-const managementOpen = ref(false);
-const appBarColor = ref('primary');
+const searchQuery = ref('')
+const searchExpanded = ref(false)
 
-// Check user role
-const userRole = computed(() => authStore.user?.role || '');
-
-// Check if user has specific role
-const hasRole = (roles) => {
-  if (Array.isArray(roles)) {
-    return roles.includes(userRole.value);
-  }
-  return userRole.value === roles;
-};
-
-// Show menu items based on role
-const canViewMenuManagement = computed(() => hasRole('manager'));
-const canViewTables = computed(() => hasRole(['staff', 'manager']));
-const canViewInventory = computed(() => hasRole(['manager', 'chef']));
-const canViewEmployees = computed(() => hasRole('manager'));
-const canViewReports = computed(() => hasRole(['manager', 'admin']));
+const visibleNavItems = computed(() => getVisibleNavItems(authStore.user?.role || 'customer'))
 
 onMounted(async () => {
   if (!authStore.user && authStore.isAuthenticated) {
     try {
-      await authStore.getCurrentUser();
+      await authStore.getCurrentUser()
     } catch (err) {
-      console.error('Failed to load user:', err);
+      console.error('Failed to load user:', err)
     }
   }
-});
+})
 
-const goHome = () => {
-  router.push('/');
-};
+function goHome() {
+  router.push(authStore.getDefaultRoute())
+}
 
-const navigateTo = (route) => {
-  const routeMap = {
-    dashboard: '/dashboard',
-    orders: '/orders',
-    menu: '/menu-management',
-    tables: '/tables',
-    inventory: '/inventory',
-    employees: '/employees',
-    reports: '/reports',
-    settings: '/settings',
-  };
+function handleSearch() {
+  const query = searchQuery.value.trim()
+  if (!query) return
+  const firstMatch = visibleNavItems.value.find((item) => item.label.toLowerCase().includes(query.toLowerCase()))
+  if (firstMatch) router.push(firstMatch.path)
+}
 
-  const path = routeMap[route] || `/${route}`;
-  router.push(path);
-};
-
-const handleSearch = async () => {
-  if (!searchQuery.value.trim()) return;
-  
-  try {
-    // TODO: Implement actual search logic based on search query
-    // For now, log the search
-    console.log('Search for:', searchQuery.value);
-    
-    // You can add global search or route to a search results page
-    // router.push({ name: 'SearchResults', query: { q: searchQuery.value } });
-  } catch (err) {
-    console.error('Search failed:', err);
-  }
-};
-
-const handleLogout = async () => {
-  await authStore.logout();
-  router.push('/login');
-};
-
-// Helper function to merge tooltip and menu props
-const mergeProps = (menuProps, tooltipProps) => {
-  return { ...tooltipProps, ...menuProps };
-};
+async function handleLogout() {
+  await authStore.logout()
+  router.push('/login')
+}
 </script>
 
 <style scoped>
@@ -262,128 +152,105 @@ const mergeProps = (menuProps, tooltipProps) => {
   z-index: 1000;
 }
 
+.side-navbar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 1000;
+  width: 88px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 10px;
+  background: #1e6abc;
+  box-shadow: 2px 0 10px rgba(16, 24, 40, .14);
+}
+
+.side-brand,
+.side-nav-btn {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  background: transparent;
+  cursor: pointer;
+}
+
+.side-brand {
+  background: rgba(255, 255, 255, .14);
+}
+
+.side-menu {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  justify-items: center;
+}
+
+.side-bottom {
+  margin-top: auto;
+}
+
+.side-nav-btn.active,
+.side-nav-btn:hover {
+  background: rgba(255, 255, 255, .2);
+}
 .navbar-wrapper {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 10px;
   width: 100%;
-  padding: 0 1rem;
+  padding: 0 14px;
 }
-
-/* Brand/Logo */
 .navbar-brand {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  margin-right: 1rem;
+  gap: 8px;
+  max-width: 210px;
   cursor: pointer;
-  flex-shrink: 0;
-}
-
-.brand-logo {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
   color: white;
-  text-decoration: none;
   font-weight: 700;
-  font-size: 1rem;
+}
+.brand-name {
+  font-size: 15px;
   white-space: nowrap;
 }
-
-.logo-icon {
-  font-size: 1.3rem;
-}
-
-/* Navigation Menu - Icon Based */
-.navbar-menu {
-  display: flex;
-  gap: 0.25rem;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.menu-icon-btn {
-  color: white !important;
-  transition: all 0.2s ease;
-}
-
-.menu-icon-btn:hover {
-  background-color: rgba(255, 255, 255, 0.15) !important;
-  transform: scale(1.1);
-}
-
-/* Right Actions */
+.navbar-menu,
 .navbar-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-left: auto;
+  gap: 4px;
 }
-
-/* Search Container */
-.search-container {
-  display: flex;
-  align-items: center;
-}
-
-.search-field {
-  width: 40px;
-  transition: width 0.3s ease;
-  background-color: rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
-}
-
-.search-field.expanded {
-  width: 200px;
-}
-
-.search-field :deep(.v-field__input) {
-  color: white;
-  font-size: 0.875rem;
-}
-
-.search-field :deep(.v-field__input)::placeholder {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.search-field :deep(.v-icon) {
-  color: white;
-}
-
-/* Action Buttons */
+.menu-icon-btn,
 .action-icon-btn {
   color: white !important;
-  transition: all 0.2s ease;
 }
-
+.menu-icon-btn.active,
+.menu-icon-btn:hover,
 .action-icon-btn:hover {
-  background-color: rgba(255, 255, 255, 0.2) !important;
-  transform: scale(1.1);
+  background-color: rgba(255, 255, 255, .18) !important;
 }
-
-/* Responsive */
+.search-field {
+  width: 190px;
+  background: rgba(255, 255, 255, .12);
+  border-radius: 6px;
+}
+.search-field :deep(.v-field__input) {
+  color: white;
+  font-size: 13px;
+}
+.search-field :deep(.v-field__input)::placeholder {
+  color: rgba(255, 255, 255, .72);
+}
 @media (max-width: 960px) {
   .brand-name {
     display: none;
   }
-
   .search-field {
     display: none;
   }
-
-  .navbar-brand {
-    margin-right: 0.5rem;
-  }
-}
-
-/* Rotate animation for menu toggles */
-.rotate-180 {
-  transform: rotate(180deg);
-  transition: transform 0.3s ease;
-}
-
-/* Badge styling */
-:deep(.v-badge__badge) {
-  font-size: 0.7rem;
 }
 </style>
