@@ -5,7 +5,6 @@ import { isAbortError } from '@/api/requestManager'
 import {
   subscribeFirestoreList,
   syncOrderFirestore,
-  syncOrdersFirestore,
 } from '@/services/firebaseFirestoreService'
 
 export const useOrderStore = defineStore('order', () => {
@@ -21,7 +20,6 @@ export const useOrderStore = defineStore('order', () => {
       const params = new URLSearchParams(filters)
       const response = await api.get(`/orders?${params.toString()}`)
       orders.value = response.data?.data?.data || response.data?.data || response.data
-      await syncOrdersFirestore(Array.isArray(orders.value) ? orders.value : [])
     } catch (err) {
       if (isAbortError(err)) throw err
       error.value = 'Failed to fetch orders'

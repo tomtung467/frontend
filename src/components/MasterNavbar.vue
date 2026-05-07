@@ -21,9 +21,6 @@
 
     <div class="side-bottom">
       <MenuUser v-if="authStore.user" :user="authStore.user" variant="side" @logout="handleLogout" />
-      <button class="side-nav-btn" @click="router.push('/settings')">
-        <v-icon size="25">mdi-cog</v-icon>
-      </button>
     </div>
   </aside>
 

@@ -13,7 +13,7 @@
 
       <section class="chart-grid">
         <article class="panel chart-panel">
-          <header><h2>Doanh thu theo ngày</h2></header>
+          <header><h2>{{ t('analytics.revenueByDay') }}</h2></header>
           <div class="bar-chart">
             <div v-for="point in revenueChart" :key="point.label" class="bar-item">
               <div class="bar-track">
@@ -25,7 +25,7 @@
         </article>
 
         <article class="panel chart-panel">
-          <header><h2>Tình trạng đơn</h2></header>
+          <header><h2>{{ t('analytics.orderStatus') }}</h2></header>
           <div class="status-chart">
             <div v-for="slice in orderStatusChart" :key="slice.label">
               <span>{{ slice.label }}</span>
@@ -39,65 +39,65 @@
       <section class="work-grid">
         <article class="panel wide">
           <header>
-            <h2>Bàn đang phục vụ</h2>
-            <button @click="loadDashboard">Làm mới</button>
+            <h2>{{ t('analytics.activeTables') }}</h2>
+            <button @click="loadDashboard">{{ t('customer.refresh') }}</button>
           </header>
           <div class="table-strip">
             <div v-for="table in activeTables" :key="table.id" class="table-pill" :class="{ alert: table.payment_requested_at }">
-              <strong>Bàn {{ table.table_number }}</strong>
-              <span>{{ table.current_customer_count || table.capacity }} khách</span>
-              <small>{{ table.occupied_since ? `Vào ${formatTime(table.occupied_since)}` : 'Chưa có giờ vào' }}</small>
-              <em v-if="table.payment_requested_at">Khách gọi thanh toán</em>
+              <strong>{{ t('tables.table') }} {{ table.table_number }}</strong>
+              <span>{{ t('analytics.guestCount', { count: table.current_customer_count || table.capacity }) }}</span>
+              <small>{{ table.occupied_since ? t('analytics.seatedAt', { time: formatTime(table.occupied_since) }) : t('analytics.noSeatedTime') }}</small>
+              <em v-if="table.payment_requested_at">{{ t('tables.paymentRequested') }}</em>
             </div>
-            <p v-if="activeTables.length === 0" class="empty">Chưa có bàn đang phục vụ.</p>
+            <p v-if="activeTables.length === 0" class="empty">{{ t('analytics.noActiveTables') }}</p>
           </div>
         </article>
 
         <article class="panel">
-          <header><h2>Việc cần xử lý</h2></header>
+          <header><h2>{{ t('analytics.actionItems') }}</h2></header>
           <ul class="task-list">
-            <li><span class="dot danger"></span><strong>{{ paymentRequests }}</strong> bàn gọi thanh toán</li>
-            <li><span class="dot success"></span><strong>{{ readyOrders }}</strong> đơn/món đã xong</li>
-            <li><span class="dot warning"></span><strong>{{ lowStockCount }}</strong> nguyên liệu sắp hết</li>
-            <li><span class="dot info"></span><strong>{{ pendingOrders }}</strong> đơn chờ bếp</li>
+            <li><span class="dot danger"></span><strong>{{ paymentRequests }}</strong> {{ t('analytics.paymentRequestTask') }}</li>
+            <li><span class="dot success"></span><strong>{{ readyOrders }}</strong> {{ t('analytics.readyOrderTask') }}</li>
+            <li><span class="dot warning"></span><strong>{{ lowStockCount }}</strong> {{ t('analytics.lowStockTask') }}</li>
+            <li><span class="dot info"></span><strong>{{ pendingOrders }}</strong> {{ t('analytics.pendingOrderTask') }}</li>
           </ul>
         </article>
       </section>
 
       <section class="work-grid lower">
         <article class="panel">
-          <header><h2>Đơn mới gần đây</h2></header>
+          <header><h2>{{ t('analytics.recentOrders') }}</h2></header>
           <div class="compact-list">
             <div v-for="order in recentOrders" :key="order.id">
               <span>{{ order.order_number || `#${order.id}` }}</span>
               <strong>{{ formatCurrency(order.total_price || order.total_amount) }}</strong>
-              <small>Bàn {{ order.table_id }} · {{ order.status }}</small>
+              <small>{{ t('tables.table') }} {{ order.table_id }} - {{ statusLabel(order.status) }}</small>
             </div>
-            <p v-if="recentOrders.length === 0" class="empty">Chưa có đơn hàng.</p>
+            <p v-if="recentOrders.length === 0" class="empty">{{ t('analytics.noRecentOrders') }}</p>
           </div>
         </article>
 
         <article class="panel">
-          <header><h2>Tồn kho cần chú ý</h2></header>
+          <header><h2>{{ t('analytics.inventoryNeedsAttention') }}</h2></header>
           <div class="compact-list">
             <div v-for="item in lowStockItems" :key="item.id">
               <span>{{ item.name }}</span>
               <strong>{{ number(item.current_quantity ?? item.quantity) }} {{ item.unit }}</strong>
-              <small>Tối thiểu {{ number(item.min_quantity ?? item.min_stock_level) }}</small>
+              <small>{{ t('analytics.minimumStock', { count: number(item.min_quantity ?? item.min_stock_level) }) }}</small>
             </div>
-            <p v-if="lowStockItems.length === 0" class="empty">Tồn kho ổn định.</p>
+            <p v-if="lowStockItems.length === 0" class="empty">{{ t('analytics.inventoryHealthy') }}</p>
           </div>
         </article>
 
         <article class="panel">
-          <header><h2>Thanh toán</h2></header>
+          <header><h2>{{ t('billing.payments') }}</h2></header>
           <div class="compact-list">
             <div v-for="payment in recentPayments" :key="payment.id">
-              <span>{{ payment.payment_method || 'payment' }}</span>
+              <span>{{ payment.payment_method || t('billing.payment') }}</span>
               <strong>{{ formatCurrency(payment.amount) }}</strong>
-              <small>{{ payment.status }} · {{ formatTime(payment.paid_at || payment.created_at) }}</small>
+              <small>{{ payment.status }} - {{ formatTime(payment.paid_at || payment.created_at) }}</small>
             </div>
-            <p v-if="recentPayments.length === 0" class="empty">Chưa có thanh toán.</p>
+            <p v-if="recentPayments.length === 0" class="empty">{{ t('billing.noPayments') }}</p>
           </div>
         </article>
       </section>
@@ -111,7 +111,7 @@ import { isAbortError } from '@/api/requestManager'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { analyticsService, inventoryService, orderService, paymentService, tableService } from '@/services'
-import { t } from '@/languages'
+import { currentLanguage, t } from '@/languages'
 
 const dashboardData = ref({})
 const tables = ref([])
@@ -137,27 +137,27 @@ const revenueChart = computed(() => {
     return acc
   }, {})
   const points = Object.entries(byDay).slice(-7)
-  const fallback = points.length ? points : [['Hôm nay', Number(dashboardData.value.total_revenue || 0)]]
+  const fallback = points.length ? points : [[t('analytics.today'), Number(dashboardData.value.total_revenue || 0)]]
   const max = Math.max(...fallback.map(([, value]) => value), 1)
   return fallback.map(([label, value]) => ({ label, height: Math.max(8, Math.round((value / max) * 100)) }))
 })
 const orderStatusChart = computed(() => {
   const rows = [
-    ['Chờ bếp', pendingOrders.value],
-    ['Đã xong', readyOrders.value],
-    ['Đã thanh toán', orders.value.filter((order) => order.status === 'paid').length],
-    ['Đã hủy', orders.value.filter((order) => order.status === 'cancelled').length],
+    [t('analytics.pendingKitchen'), pendingOrders.value],
+    [t('analytics.completedOrders'), readyOrders.value],
+    [t('status.paid'), orders.value.filter((order) => order.status === 'paid').length],
+    [t('status.cancelled'), orders.value.filter((order) => order.status === 'cancelled').length],
   ]
   const max = Math.max(...rows.map(([, value]) => value), 1)
   return rows.map(([label, value]) => ({ label, value, width: Math.max(6, Math.round((value / max) * 100)) }))
 })
 
 const metrics = computed(() => [
-  { label: 'Doanh thu hôm nay', value: formatCurrency(dashboardData.value.total_revenue), hint: 'Tổng tiền đã ghi nhận', tone: 'revenue' },
-  { label: 'Đơn hàng', value: dashboardData.value.total_orders || orders.value.length, hint: `${pendingOrders.value} đang xử lý`, tone: 'orders' },
-  { label: 'Bàn đang phục vụ', value: activeTables.value.length, hint: `${paymentRequests.value} bàn gọi thanh toán`, tone: 'tables' },
-  { label: 'Tồn kho thấp', value: lowStockCount.value, hint: 'Cần bổ sung nguyên liệu', tone: 'stock' },
-  { label: 'Giá trị TB/đơn', value: formatCurrency(dashboardData.value.avg_order_value), hint: 'Theo dữ liệu dashboard', tone: 'average' },
+  { label: t('analytics.todayRevenue'), value: formatCurrency(dashboardData.value.total_revenue), hint: t('analytics.recordedRevenue'), tone: 'revenue' },
+  { label: t('analytics.orders'), value: dashboardData.value.total_orders || orders.value.length, hint: t('analytics.processingOrders', { count: pendingOrders.value }), tone: 'orders' },
+  { label: t('analytics.activeTables'), value: activeTables.value.length, hint: t('analytics.paymentRequests', { count: paymentRequests.value }), tone: 'tables' },
+  { label: t('analytics.lowStock'), value: lowStockCount.value, hint: t('analytics.needRestock'), tone: 'stock' },
+  { label: t('analytics.averageOrderValue'), value: formatCurrency(dashboardData.value.avg_order_value), hint: t('analytics.dashboardDataHint'), tone: 'average' },
 ])
 
 onMounted(loadDashboard)
@@ -193,15 +193,23 @@ function isLowStock(item) {
 }
 
 function formatCurrency(value) {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value || 0))
+  return new Intl.NumberFormat(locale(), { style: 'currency', currency: 'VND' }).format(Number(value || 0))
 }
 
 function formatTime(value) {
-  return value ? new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '-'
+  return value ? new Intl.DateTimeFormat(locale(), { hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '-'
 }
 
 function number(value) {
-  return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(Number(value || 0))
+  return new Intl.NumberFormat(locale(), { maximumFractionDigits: 2 }).format(Number(value || 0))
+}
+
+function locale() {
+  return currentLanguage.value === 'en' ? 'en-US' : 'vi-VN'
+}
+
+function statusLabel(status) {
+  return t(`status.${status}`)
 }
 </script>
 

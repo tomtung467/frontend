@@ -11,7 +11,7 @@ export const ROLES = [
 export const NAV_ITEMS = [
   { key: 'customer-menu', labelKey: 'nav.customerMenu', icon: 'mdi-silverware-fork-knife', path: '/menu', roles: ['customer'] },
   { key: 'customer-cart', labelKey: 'nav.customerCart', icon: 'mdi-cart', path: '/cart', roles: ['customer'] },
-  { key: 'customer-orders', labelKey: 'nav.customerOrders', icon: 'mdi-clipboard-text-clock', path: '/orders', roles: ['customer'] },
+  { key: 'customer-orders', labelKey: 'nav.customerOrders', icon: 'mdi-clipboard-text-clock', path: '/my-orders', roles: ['customer'] },
   { key: 'dashboard', labelKey: 'nav.dashboard', icon: 'mdi-chart-box', path: '/dashboard', roles: ['manager', 'admin'] },
   { key: 'orders', labelKey: 'nav.orders', icon: 'mdi-clipboard-list', path: '/orders', roles: ['staff', 'manager', 'admin'] },
   { key: 'kitchen', labelKey: 'nav.kitchen', icon: 'mdi-chef-hat', path: '/kitchen', roles: ['chef', 'admin'] },
@@ -22,7 +22,6 @@ export const NAV_ITEMS = [
   { key: 'payments', labelKey: 'nav.payments', icon: 'mdi-cash-register', path: '/payments', roles: ['staff', 'manager', 'admin'] },
   { key: 'invoices', labelKey: 'nav.invoices', icon: 'mdi-receipt-text', path: '/invoices', roles: ['staff', 'manager', 'admin'] },
   { key: 'reports', labelKey: 'nav.reports', icon: 'mdi-chart-line', path: '/reports', roles: ['manager', 'admin'] },
-  { key: 'settings', labelKey: 'nav.settings', icon: 'mdi-cog', path: '/settings', roles: ['customer', 'staff', 'chef', 'manager', 'admin'] },
 ]
 
 export function getDefaultPermissions() {
@@ -57,5 +56,9 @@ export function canAccessPermission(role, permissionKey) {
 }
 
 export function getVisibleNavItems(role) {
-  return NAV_ITEMS.filter((item) => canAccessPermission(role, item.key))
+  return NAV_ITEMS.filter((item) => {
+    const isCustomerOnly = item.roles.length === 1 && item.roles[0] === 'customer'
+    if (isCustomerOnly && role !== 'customer') return false
+    return canAccessPermission(role, item.key)
+  })
 }

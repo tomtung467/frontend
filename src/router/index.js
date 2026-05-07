@@ -66,10 +66,10 @@ const routes = [
     meta: { requiresAuth: true, role: "customer" },
   },
   {
-    path: "/orders",
-    name: "Orders",
+    path: "/my-orders",
+    name: "CustomerOrders",
     component: () => import("@/modules/customer/views/OrdersView.vue"),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, role: "customer" },
   },
   {
     path: "/orders/table/:tableId",
@@ -90,6 +90,12 @@ const routes = [
     name: "Tables",
     component: () => import("@/modules/operations/views/TablesView.vue"),
     meta: { requiresAuth: true, permission: "tables" },
+  },
+  {
+    path: "/orders",
+    name: "Orders",
+    component: () => import("@/modules/operations/views/OrdersView.vue"),
+    meta: { requiresAuth: true, permission: "orders" },
   },
 
   // Kitchen Module
@@ -244,9 +250,6 @@ router.beforeEach(async (to) => {
 
   if (to.meta.requiresAuth && authStore.isAuthenticated && to.meta.role) {
     const userRole = authStore.user?.role;
-    if (userRole === "admin") {
-      return;
-    }
     const allowedRoles = Array.isArray(to.meta.role) 
       ? to.meta.role 
       : [to.meta.role];

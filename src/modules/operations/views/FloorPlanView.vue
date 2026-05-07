@@ -43,7 +43,7 @@ onUnmounted(() => {
 
 function selectTable(table) {
   tableStore.selectTable(table)
-  router.push('/menu')
+  router.push('/tables')
 }
 
 function normalizedStatus(table) {

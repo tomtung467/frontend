@@ -109,7 +109,7 @@ async function checkout() {
   try {
     await cartStore.checkout('card')
     alert(t('customer.orderSent'))
-    router.push(tableId.value ? `/orders/table/${tableId.value}` : '/orders')
+    router.push(tableId.value ? `/orders/table/${tableId.value}` : '/my-orders')
   } catch (err) {
     alert(`${t('customer.checkoutFailed')}: ${err.message}`)
   }

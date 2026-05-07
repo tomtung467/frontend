@@ -27,7 +27,7 @@
       </v-chip>
     </template>
 
-    <v-card width="300">
+    <v-card width="360">
       <v-list>
         <v-list-item class="user-header">
           <template #prepend>
@@ -54,16 +54,27 @@
       <v-divider />
 
       <v-list>
+        <v-list-item prepend-icon="mdi-translate" class="language-item">
+          <v-list-item-title>{{ t('settings.language') }}</v-list-item-title>
+          <template #append>
+            <select v-model="selectedLanguage" class="language-select" @click.stop>
+              <option v-for="language in languageOptions" :key="language.value" :value="language.value">
+                {{ t(language.labelKey) }}
+              </option>
+            </select>
+          </template>
+        </v-list-item>
+
         <v-list-item prepend-icon="mdi-account-circle" link @click="goToProfile">
-          <v-list-item-title>Ho so ca nhan</v-list-item-title>
+          <v-list-item-title>{{ t('user.profile') }}</v-list-item-title>
         </v-list-item>
 
         <v-list-item prepend-icon="mdi-cog" link @click="goToSettings">
-          <v-list-item-title>Cai dat</v-list-item-title>
+          <v-list-item-title>{{ t('user.settings') }}</v-list-item-title>
         </v-list-item>
 
         <v-list-item prepend-icon="mdi-lock-reset" link @click="goToChangePassword">
-          <v-list-item-title>Doi mat khau</v-list-item-title>
+          <v-list-item-title>{{ t('user.changePassword') }}</v-list-item-title>
         </v-list-item>
       </v-list>
 
@@ -71,7 +82,7 @@
 
       <v-list>
         <v-list-item prepend-icon="mdi-logout" link color="error" @click="handleLogout">
-          <v-list-item-title>Dang xuat</v-list-item-title>
+          <v-list-item-title>{{ t('user.logout') }}</v-list-item-title>
         </v-list-item>
       </v-list>
     </v-card>
@@ -83,19 +94,19 @@
         <v-card-text class="pa-6">
           <div class="text-center">
             <v-icon color="warning" size="48" class="mb-4">mdi-logout</v-icon>
-            <h3 class="text-h5 mb-4">Xac nhan dang xuat</h3>
+            <h3 class="text-h5 mb-4">{{ t('user.logoutConfirmTitle') }}</h3>
             <p class="text-subtitle1 mb-6">
-              Ban co chac chan muon dang xuat khong?
+              {{ t('user.logoutConfirmBody') }}
             </p>
           </div>
         </v-card-text>
 
         <v-card-actions class="justify-end gap-2 pa-4">
           <v-btn variant="outlined" @click="showLogoutDialog = false">
-            Huy
+            {{ t('user.cancel') }}
           </v-btn>
           <v-btn color="error" @click="confirmLogout">
-            Dang xuat
+            {{ t('user.logout') }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -106,6 +117,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { currentLanguage, languageOptions, setLanguage, t } from '@/languages';
 
 interface User {
   id?: string | number;
@@ -129,9 +141,13 @@ const menu = ref(false);
 const showLogoutDialog = ref(false);
 
 const variant = computed(() => props.variant || 'chip');
-const userName = computed(() => props.user?.name || 'Nguoi dung');
+const userName = computed(() => props.user?.name || t('user.fallbackName'));
 const userEmail = computed(() => props.user?.email || '');
 const userAvatar = computed(() => props.user?.avatar || '');
+const selectedLanguage = computed({
+  get: () => currentLanguage.value,
+  set: (language: string) => setLanguage(language),
+});
 const userInitials = computed(() => {
   const source = userName.value || userEmail.value || 'U';
   return source
@@ -200,6 +216,21 @@ const confirmLogout = () => {
 .user-header {
   padding: 1rem;
   background-color: #f5f5f5;
+}
+
+.language-item :deep(.v-list-item__append) {
+  margin-left: 12px;
+}
+
+.language-select {
+  width: 132px;
+  min-height: 34px;
+  border: 1px solid #d0d5dd;
+  border-radius: 7px;
+  background: #fff;
+  color: #1f2937;
+  padding: 0 28px 0 10px;
+  font-size: 14px;
 }
 
 .side-user-btn {

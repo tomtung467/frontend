@@ -21,7 +21,7 @@
             <router-link to="/cart" class="link-btn">
               🛒 Giỏ hàng
             </router-link>
-            <router-link to="/orders" class="link-btn">
+            <router-link to="/my-orders" class="link-btn">
               📝 Đơn hàng của tôi
             </router-link>
           </div>

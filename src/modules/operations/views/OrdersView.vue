@@ -1,9 +1,14 @@
 <template>
   <MasterLayout show-footer>
     <main class="orders-page">
-      <MasterPageHeader :title="t('customer.myOrders')">
+      <MasterPageHeader :title="t('nav.orders')">
         <template #actions>
-          <router-link :to="tableId ? `/menu/table/${tableId}` : '/menu'" class="ghost-action">{{ t('customer.orderMore') }}</router-link>
+          <select v-model="statusFilter" class="filter-control" @change="loadOrders">
+            <option value="">{{ t('billing.allStatuses') }}</option>
+            <option v-for="status in statuses" :key="status" :value="status">
+              {{ statusLabel(status) }}
+            </option>
+          </select>
           <button class="ghost-action" @click="loadOrders">{{ t('customer.refresh') }}</button>
         </template>
       </MasterPageHeader>
@@ -25,12 +30,13 @@
 
       <p v-if="loading" class="state">{{ t('customer.loadingOrders') }}</p>
       <p v-else-if="error" class="state error">{{ error }}</p>
+
       <section v-else-if="orders.length" class="orders-list">
         <article v-for="order in orders" :key="order.id" class="order-card">
           <header>
             <div>
               <h2>{{ order.order_number || `${t('kitchen.order')} #${order.id}` }}</h2>
-              <p>{{ t('kitchen.table') }} {{ order.table_id }} · {{ formatDate(order.created_at) }}</p>
+              <p>{{ t('kitchen.table') }} {{ order.table_id || '-' }} - {{ formatDate(order.created_at) }}</p>
             </div>
             <span class="status" :class="order.status">{{ statusLabel(order.status) }}</span>
           </header>
@@ -50,16 +56,7 @@
             <aside>
               <span>{{ t('customer.total') }}</span>
               <strong>{{ formatPrice(order.total_price || order.total_amount) }}</strong>
-              <button
-                v-if="canRequestPayment(order)"
-                class="primary-action"
-                @click="requestPayment(order)"
-              >
-                {{ t('customer.requestPayment') }}
-              </button>
-              <p v-else-if="order.payment_requested_at" class="success-note">
-                {{ t('customer.paymentAccepted') }}
-              </p>
+              <em v-if="order.payment_requested_at">{{ t('billing.customerPayment') }}</em>
             </aside>
           </div>
         </article>
@@ -67,7 +64,6 @@
 
       <section v-else class="state empty">
         <h2>{{ t('customer.noOrders') }}</h2>
-        <router-link :to="tableId ? `/menu/table/${tableId}` : '/menu'" class="primary-link">{{ t('customer.viewMenu') }}</router-link>
       </section>
     </main>
   </MasterLayout>
@@ -75,17 +71,16 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { useOrderStore } from '@/stores/useOrderStore'
 import { currentLanguage, t } from '@/languages'
 
 const orderStore = useOrderStore()
-const route = useRoute()
 const loading = ref(false)
 const error = ref('')
-const tableId = computed(() => route.params.tableId || '')
+const statusFilter = ref('')
+const statuses = ['pending', 'confirmed', 'in_progress', 'ready', 'served', 'paid', 'cancelled']
 
 const orders = computed(() => Array.isArray(orderStore.orders) ? orderStore.orders : [])
 const activeOrders = computed(() => orders.value.filter((order) => ['pending', 'confirmed', 'in_progress'].includes(order.status)))
@@ -100,7 +95,8 @@ async function loadOrders() {
   loading.value = true
   error.value = ''
   try {
-    await orderStore.fetchOrders(tableId.value ? { table_id: tableId.value } : {})
+    const filters = statusFilter.value ? { status: statusFilter.value } : {}
+    await orderStore.fetchOrders(filters)
   } catch (err) {
     error.value = err.message || t('customer.loadingOrders')
   } finally {
@@ -110,18 +106,6 @@ async function loadOrders() {
 
 function orderItems(order) {
   return order.items || order.orderItems || order.order_items || []
-}
-
-function canRequestPayment(order) {
-  return ['confirmed', 'in_progress', 'ready', 'served'].includes(order.status) && !order.payment_requested_at
-}
-
-async function requestPayment(order) {
-  try {
-    await orderStore.requestPayment(order.id)
-  } catch (err) {
-    error.value = err.message || t('customer.reservationFailed')
-  }
 }
 
 function statusLabel(status) {
@@ -141,6 +125,7 @@ function formatDate(date) {
 
 <style scoped>
 .orders-page { padding: 24px; width: min(1180px, 100%); margin: 0 auto; }
+.filter-control { min-height: 38px; border: 1px solid #d0d5dd; border-radius: 7px; padding: 0 12px; color: #344054; background: #fff; }
 .summary-row { display: grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap: 14px; margin-bottom: 18px; }
 .summary-row article, .order-card, .state { background: #fff; border: 1px solid #dfe3ea; border-radius: 8px; box-shadow: 0 3px 10px rgba(16,24,40,.05); }
 .summary-row article { padding: 16px; }
@@ -163,13 +148,11 @@ li { display: flex; justify-content: space-between; gap: 12px; color: #344054; }
 aside { min-width: 220px; display: grid; align-content: start; gap: 10px; padding: 14px; border-radius: 8px; background: #f8fafc; }
 aside span { color: #667085; }
 aside strong { color: #f05a28; font-size: 24px; }
-button, .ghost-action, .primary-link { min-height: 38px; border: 0; border-radius: 7px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-weight: 800; cursor: pointer; }
+aside em { color: #b42318; font-style: normal; font-weight: 800; }
+button, .ghost-action { min-height: 38px; border: 0; border-radius: 7px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-weight: 800; cursor: pointer; }
 .ghost-action { background: #f2f4f7; color: #344054; }
-.primary-action, .primary-link { background: #155eef; color: #fff; }
-.success-note { color: #027a48; font-weight: 800; }
 .state { padding: 28px; color: #475467; text-align: center; }
 .state.error { color: #b42318; background: #fffbfa; border-color: #fecdca; }
-.state.empty { display: grid; gap: 14px; justify-items: center; }
 @media (max-width: 760px) {
   .orders-page { padding: 16px; }
   .summary-row { grid-template-columns: 1fr; }
