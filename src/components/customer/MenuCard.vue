@@ -3,8 +3,8 @@
     <!-- Image -->
     <div class="relative w-full h-48 bg-gray-200 overflow-hidden">
       <img
-        v-if="food.image"
-        :src="food.image"
+        v-if="imageUrl"
+        :src="imageUrl"
         :alt="food.name"
         class="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
       />
@@ -67,7 +67,8 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits } from 'vue'
+import { computed, defineProps, defineEmits } from 'vue'
+import { resolveAssetUrl } from '@/utils/assetUrl'
 
 const props = defineProps({
   food: {
@@ -90,6 +91,11 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['add-to-cart', 'view-details'])
+
+const imageUrl = computed(() => {
+  const value = props.food.image || props.food.image_url
+  return value ? resolveAssetUrl(value) : ''
+})
 
 const formatPrice = (price) => {
   return new Intl.NumberFormat('vi-VN', {

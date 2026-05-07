@@ -1,7 +1,7 @@
 <template>
   <MasterLayout show-footer>
     <main class="dashboard-view">
-      <MasterPageHeader title="Tổng quan" />
+      <MasterPageHeader :title="t('analytics.dashboard')" />
 
       <section class="metric-grid">
         <article v-for="metric in metrics" :key="metric.label" class="metric-card" :class="metric.tone">
@@ -111,6 +111,7 @@ import { isAbortError } from '@/api/requestManager'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { analyticsService, inventoryService, orderService, paymentService, tableService } from '@/services'
+import { t } from '@/languages'
 
 const dashboardData = ref({})
 const tables = ref([])

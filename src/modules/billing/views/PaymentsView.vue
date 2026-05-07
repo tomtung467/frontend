@@ -1,46 +1,46 @@
 <template>
   <MasterLayout show-footer>
     <main class="ops-page">
-      <MasterPageHeader title="Thanh toán">
+      <MasterPageHeader :title="t('billing.payments')">
         <template #actions>
-          <button class="primary-action" @click="processPayment" :disabled="saving">
-            {{ saving ? 'Đang xử lý...' : 'Ghi nhận thanh toán' }}
+          <button class="primary-action" :disabled="saving" @click="processPayment">
+            {{ saving ? t('billing.processing') : t('billing.recordPayment') }}
           </button>
         </template>
       </MasterPageHeader>
 
       <form class="inline-form" @submit.prevent="processPayment">
-        <input v-model.number="form.order_id" required type="number" placeholder="Order ID" />
-        <input v-model.number="form.amount" required type="number" step="1000" placeholder="Amount" />
+        <input v-model.number="form.order_id" required type="number" :placeholder="t('billing.orderId')" />
+        <input v-model.number="form.amount" required type="number" step="1000" :placeholder="t('billing.amount')" />
         <select v-model="form.payment_method" required>
-          <option value="cash">Cash</option>
-          <option value="card">Card</option>
-          <option value="qr_code">QR code</option>
-          <option value="digital_wallet">Digital wallet</option>
+          <option value="cash">{{ t('billing.cash') }}</option>
+          <option value="card">{{ t('billing.card') }}</option>
+          <option value="qr_code">{{ t('billing.qrCode') }}</option>
+          <option value="digital_wallet">{{ t('billing.digitalWallet') }}</option>
         </select>
-        <input v-model="form.reference_code" placeholder="Reference code" />
+        <input v-model="form.reference_code" :placeholder="t('billing.referenceCode')" />
       </form>
 
       <section class="summary-strip">
-        <div class="metric"><span>Total payments</span><strong>{{ payments.length }}</strong></div>
-        <div class="metric"><span>Completed</span><strong>{{ countByStatus('completed') }}</strong></div>
-        <div class="metric"><span>Paid value</span><strong>{{ formatCurrency(totalPaid) }}</strong></div>
+        <div class="metric"><span>{{ t('billing.totalPayments') }}</span><strong>{{ payments.length }}</strong></div>
+        <div class="metric"><span>{{ t('billing.completed') }}</span><strong>{{ countByStatus('completed') }}</strong></div>
+        <div class="metric"><span>{{ t('billing.paidValue') }}</span><strong>{{ formatCurrency(totalPaid) }}</strong></div>
       </section>
 
       <p v-if="error" class="state error">{{ error }}</p>
-      <p v-else-if="loading" class="state">Loading payments...</p>
-      <p v-else-if="payments.length === 0" class="state">No payments have been recorded yet.</p>
+      <p v-else-if="loading" class="state">{{ t('billing.loadingPayments') }}</p>
+      <p v-else-if="payments.length === 0" class="state">{{ t('billing.noPayments') }}</p>
 
       <div v-else class="data-table">
         <table>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Order</th>
-              <th>Method</th>
-              <th>Amount</th>
-              <th>Status</th>
-              <th>Paid at</th>
+              <th>{{ t('billing.id') }}</th>
+              <th>{{ t('billing.order') }}</th>
+              <th>{{ t('billing.method') }}</th>
+              <th>{{ t('billing.amount') }}</th>
+              <th>{{ t('billing.status') }}</th>
+              <th>{{ t('billing.paidAt') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -64,6 +64,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { paymentService } from '@/services'
+import { currentLanguage, t } from '@/languages'
 
 const payments = ref([])
 const loading = ref(false)
@@ -85,7 +86,7 @@ async function loadPayments() {
   try {
     payments.value = await paymentService.getPayments()
   } catch (err) {
-    error.value = err.message || 'Failed to load payments.'
+    error.value = err.message || t('billing.failedPayments')
   } finally {
     loading.value = false
   }
@@ -100,7 +101,7 @@ async function processPayment() {
     Object.assign(form, { order_id: null, amount: null, payment_method: 'cash', reference_code: '' })
     await loadPayments()
   } catch (err) {
-    error.value = err.message || 'Failed to record payment.'
+    error.value = err.message || t('billing.failedRecord')
   } finally {
     saving.value = false
   }
@@ -110,12 +111,16 @@ function countByStatus(status) {
   return payments.value.filter((payment) => payment.status === status).length
 }
 
+function locale() {
+  return currentLanguage.value === 'en' ? 'en-US' : 'vi-VN'
+}
+
 function formatCurrency(value) {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value || 0))
+  return new Intl.NumberFormat(locale(), { style: 'currency', currency: 'VND' }).format(Number(value || 0))
 }
 
 function formatDate(value) {
-  return value ? new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : '-'
+  return value ? new Intl.DateTimeFormat(locale(), { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : '-'
 }
 </script>
 

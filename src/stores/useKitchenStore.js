@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '@/api'
+import {
+  subscribeFirestoreList,
+  syncKitchenQueueFirestore,
+  syncOrderFirestore,
+} from '@/services/firebaseFirestoreService'
 
 export const useKitchenStore = defineStore('kitchen', () => {
   const queue = ref([])
@@ -13,7 +18,8 @@ export const useKitchenStore = defineStore('kitchen', () => {
     error.value = null
     try {
       const response = await api.get('/kitchen/queue')
-      queue.value = response.data
+      queue.value = response.data?.data || response.data
+      await syncKitchenQueueFirestore(Array.isArray(queue.value) ? queue.value : [])
     } catch (err) {
       error.value = 'Failed to fetch kitchen queue'
       console.error(err)
@@ -27,7 +33,7 @@ export const useKitchenStore = defineStore('kitchen', () => {
     error.value = null
     try {
       const response = await api.get('/kitchen/ready-orders')
-      readyOrders.value = response.data
+      readyOrders.value = response.data?.data || response.data
     } catch (err) {
       error.value = 'Failed to fetch ready orders'
       console.error(err)
@@ -39,11 +45,13 @@ export const useKitchenStore = defineStore('kitchen', () => {
   async function updateOrderStatus(orderId, status) {
     try {
       const response = await api.put(`/kitchen/orders/${orderId}/status`, { status })
+      const updated = response.data?.data || response.data
       const index = queue.value.findIndex(o => o.id === orderId)
       if (index !== -1) {
-        queue.value[index] = response.data
+        queue.value[index] = updated
       }
-      return response.data
+      await syncOrderFirestore(updated)
+      return updated
     } catch (err) {
       error.value = 'Failed to update order status'
       throw err
@@ -53,8 +61,10 @@ export const useKitchenStore = defineStore('kitchen', () => {
   async function completeOrder(orderId) {
     try {
       const response = await api.put(`/kitchen/orders/${orderId}/complete`)
+      const updated = response.data?.data || response.data
       queue.value = queue.value.filter(o => o.id !== orderId)
-      return response.data
+      await syncOrderFirestore(updated)
+      return updated
     } catch (err) {
       error.value = 'Failed to complete order'
       throw err
@@ -71,6 +81,12 @@ export const useKitchenStore = defineStore('kitchen', () => {
     }
   }
 
+  function subscribeToQueue(options = {}) {
+    return subscribeFirestoreList('kitchenQueue', (firestoreQueue) => {
+      queue.value = firestoreQueue
+    }, options)
+  }
+
   return {
     queue,
     readyOrders,
@@ -81,5 +97,6 @@ export const useKitchenStore = defineStore('kitchen', () => {
     updateOrderStatus,
     completeOrder,
     printOrder,
+    subscribeToQueue,
   }
 })

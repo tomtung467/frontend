@@ -1,88 +1,79 @@
 <template>
   <MasterLayout show-footer>
     <main class="ops-page">
-      <MasterPageHeader title="Kho vận hành">
+      <MasterPageHeader :title="t('inventory.title')">
         <template #actions>
-          <button class="primary-action" @click="createIngredient" :disabled="saving">
-            {{ saving ? 'Đang lưu...' : 'Thêm nguyên liệu' }}
+          <button class="primary-action" :disabled="saving" @click="createIngredient">
+            {{ saving ? t('menu.saving') : t('inventory.addIngredient') }}
           </button>
         </template>
       </MasterPageHeader>
 
       <section class="summary-strip">
-        <div class="metric">
-          <span>Total items</span>
-          <strong>{{ inventory.length }}</strong>
-        </div>
-        <div class="metric warning">
-          <span>Low stock</span>
-          <strong>{{ lowStockCount }}</strong>
-        </div>
-        <div class="metric">
-          <span>Inventory value</span>
-          <strong>{{ formatCurrency(totalValue) }}</strong>
-        </div>
+        <div class="metric"><span>{{ t('inventory.totalItems') }}</span><strong>{{ inventory.length }}</strong></div>
+        <div class="metric warning"><span>{{ t('inventory.lowStock') }}</span><strong>{{ lowStockCount }}</strong></div>
+        <div class="metric"><span>{{ t('inventory.inventoryValue') }}</span><strong>{{ formatCurrency(totalValue) }}</strong></div>
       </section>
 
       <section class="toolbar">
-        <input v-model="search" type="search" placeholder="Search ingredient or category" />
+        <input v-model="search" type="search" :placeholder="t('inventory.search')" />
         <select v-model="stockFilter">
-          <option value="all">All stock</option>
-          <option value="low">Low stock only</option>
+          <option value="all">{{ t('inventory.allStock') }}</option>
+          <option value="low">{{ t('inventory.lowOnly') }}</option>
         </select>
-        <button class="ghost-action" @click="loadInventory">Refresh</button>
+        <button class="ghost-action" @click="loadInventory">{{ t('customer.refresh') }}</button>
       </section>
 
       <form class="inline-form" @submit.prevent="createIngredient">
-        <input v-model="form.name" required placeholder="Ingredient name" />
-        <input v-model="form.category" placeholder="Category" />
-        <input v-model.number="form.current_quantity" required type="number" step="0.01" placeholder="Qty" />
-        <input v-model="form.unit" required placeholder="Unit" />
-        <input v-model.number="form.min_quantity" type="number" step="0.01" placeholder="Min" />
-        <input v-model.number="form.unit_cost" type="number" step="100" placeholder="Unit cost" />
+        <input v-model="form.name" required :placeholder="t('inventory.ingredientName')" />
+        <input v-model="form.category" :placeholder="t('inventory.category')" />
+        <input v-model.number="form.current_quantity" required type="number" step="0.01" :placeholder="t('inventory.quantity')" />
+        <input v-model="form.unit" required :placeholder="t('inventory.unit')" />
+        <input v-model.number="form.min_quantity" type="number" step="0.01" :placeholder="t('inventory.minimum')" />
+        <input v-model.number="form.unit_cost" type="number" step="100" :placeholder="t('inventory.unitCost')" />
       </form>
 
       <p v-if="error" class="state error">{{ error }}</p>
-      <p v-else-if="loading" class="state">Loading inventory...</p>
-      <p v-else-if="filteredInventory.length === 0" class="state">No ingredients match the current filter.</p>
+      <p v-else-if="loading" class="state">{{ t('inventory.loading') }}</p>
+      <p v-else-if="filteredInventory.length === 0" class="state">{{ t('inventory.noMatch') }}</p>
 
       <div v-else class="data-table">
         <table>
           <thead>
             <tr>
-              <th>Ingredient</th>
-              <th>Category</th>
-              <th>Stock</th>
-              <th>Minimum</th>
-              <th>Unit cost</th>
-              <th>Status</th>
-              <th>Adjust</th>
-              <th>Delete</th>
+              <th>{{ t('inventory.ingredient') }}</th>
+              <th>{{ t('inventory.category') }}</th>
+              <th>{{ t('inventory.stock') }}</th>
+              <th>{{ t('inventory.minimum') }}</th>
+              <th>{{ t('inventory.unitCost') }}</th>
+              <th>{{ t('inventory.status') }}</th>
+              <th>{{ t('inventory.adjust') }}</th>
+              <th>{{ t('menu.delete') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="item in filteredInventory" :key="item.id">
               <td>
                 <strong>{{ item.name }}</strong>
-                <small>{{ item.description || 'No notes' }}</small>
+                <small>{{ item.description || t('inventory.noNotes') }}</small>
               </td>
-              <td>{{ item.category || 'general' }}</td>
+              <td>{{ item.category || t('inventory.general') }}</td>
               <td>{{ number(item.current_quantity ?? item.quantity) }} {{ item.unit }}</td>
               <td>{{ number(item.min_quantity ?? item.min_stock_level) }} {{ item.unit }}</td>
               <td>{{ formatCurrency(item.unit_cost ?? item.cost_per_unit) }}</td>
               <td>
                 <span class="badge" :class="{ danger: isLowStock(item) }">
-                  {{ isLowStock(item) ? 'Low stock' : 'Healthy' }}
+                  {{ isLowStock(item) ? t('inventory.lowStock') : t('inventory.healthy') }}
                 </span>
               </td>
               <td>
                 <div class="adjust">
                   <input v-model.number="adjustments[item.id]" type="number" step="0.01" />
-                  <button @click="adjustStock(item)" :disabled="saving || !adjustments[item.id]">Apply</button>
+                  <button :disabled="saving || !adjustments[item.id]" @click="adjustStock(item)">{{ t('inventory.apply') }}</button>
                 </div>
               </td>
               <td>
-                <button class="danger-action" @click="deleteIngredient(item)" :disabled="saving">Delete</button>
+                <button class="danger-action" :disabled="saving" @click="deleteIngredient(item)">{{ t('menu.delete') }}</button>
               </td>
             </tr>
           </tbody>
@@ -97,6 +88,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { inventoryService } from '@/services'
+import { currentLanguage, t } from '@/languages'
 
 const inventory = ref([])
 const loading = ref(false)
@@ -143,7 +135,7 @@ async function loadInventory() {
   try {
     inventory.value = await inventoryService.getInventory()
   } catch (err) {
-    error.value = err.message || 'Failed to load inventory.'
+    error.value = err.message || t('inventory.failedLoad')
   } finally {
     loading.value = false
   }
@@ -158,7 +150,7 @@ async function createIngredient() {
     Object.assign(form, { name: '', category: '', current_quantity: 0, unit: '', min_quantity: 0, unit_cost: 0 })
     await loadInventory()
   } catch (err) {
-    error.value = err.message || 'Failed to create ingredient.'
+    error.value = err.message || t('inventory.failedCreate')
   } finally {
     saving.value = false
   }
@@ -174,7 +166,7 @@ async function adjustStock(item) {
     adjustments[item.id] = ''
     await loadInventory()
   } catch (err) {
-    error.value = err.message || 'Failed to update stock.'
+    error.value = err.message || t('inventory.failedUpdate')
   } finally {
     saving.value = false
   }
@@ -187,7 +179,7 @@ async function deleteIngredient(item) {
     await inventoryService.deleteIngredient(item.id)
     await loadInventory()
   } catch (err) {
-    error.value = err.message || 'Failed to delete ingredient.'
+    error.value = err.message || t('inventory.failedDelete')
   } finally {
     saving.value = false
   }
@@ -197,12 +189,16 @@ function isLowStock(item) {
   return Number(item.current_quantity ?? item.quantity ?? 0) <= Number(item.min_quantity ?? item.min_stock_level ?? 0)
 }
 
+function locale() {
+  return currentLanguage.value === 'en' ? 'en-US' : 'vi-VN'
+}
+
 function formatCurrency(value) {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value || 0))
+  return new Intl.NumberFormat(locale(), { style: 'currency', currency: 'VND' }).format(Number(value || 0))
 }
 
 function number(value) {
-  return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(Number(value || 0))
+  return new Intl.NumberFormat(locale(), { maximumFractionDigits: 2 }).format(Number(value || 0))
 }
 </script>
 

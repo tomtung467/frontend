@@ -1,15 +1,15 @@
 <template>
   <MasterLayout>
     <main class="kitchen-page">
-      <MasterPageHeader title="Bảng bếp">
+      <MasterPageHeader :title="t('kitchen.board')">
         <template #actions>
-          <router-link class="ghost-action" to="/kitchen/queue">Queue list</router-link>
-          <button @click="refreshQueue" class="primary-action">Refresh Queue</button>
+          <router-link class="ghost-action" to="/kitchen/queue">{{ t('kitchen.queueList') }}</router-link>
+          <button class="primary-action" @click="refreshQueue">{{ t('kitchen.refreshQueue') }}</button>
         </template>
       </MasterPageHeader>
 
       <p v-if="kitchenStore.error" class="state error">{{ kitchenStore.error }}</p>
-      <p v-else-if="kitchenStore.loading" class="state">Loading queue...</p>
+      <p v-else-if="kitchenStore.loading" class="state">{{ t('kitchen.loadingQueue') }}</p>
 
       <section class="kanban-board">
         <article v-for="column in columns" :key="column.key" class="kanban-column" :class="column.key">
@@ -19,19 +19,19 @@
           </header>
 
           <div v-if="ordersByStatus(column.statuses).length === 0" class="empty-column">
-            No active tickets
+            {{ t('kitchen.noTickets') }}
           </div>
 
           <div v-for="order in ordersByStatus(column.statuses)" :key="order.id" class="order-card">
             <div class="order-topline">
-              <strong>{{ order.order_number || `Order #${order.id}` }}</strong>
-              <span>Table {{ order.table_id }}</span>
+              <strong>{{ order.order_number || `${t('kitchen.order')} #${order.id}` }}</strong>
+              <span>{{ t('kitchen.table') }} {{ order.table_id }}</span>
             </div>
             <div v-if="column.key === 'cooking'" class="timer">{{ getTimer(order) }}</div>
             <div class="order-items">
-              <div v-for="item in orderItems(order)" :key="item.id" class="item">
+              <div v-for="item in orderItems(order)" :key="item.id || item.food_id" class="item">
                 <span class="qty">{{ item.quantity }}x</span>
-                <span>{{ item.food?.name || item.food_name || item.name || `Food #${item.food_id}` }}</span>
+                <span>{{ item.food?.name || item.food_name || item.name || `${t('menu.title')} #${item.food_id}` }}</span>
               </div>
             </div>
             <p v-if="order.customer_notes || order.special_requests" class="notes">
@@ -41,7 +41,7 @@
               {{ column.next.label }}
             </button>
             <button v-else class="ticket-action done" @click="completeOrder(order.id)">
-              Mark served
+              {{ t('kitchen.markServed') }}
             </button>
           </div>
         </article>
@@ -55,28 +55,38 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { useKitchenStore } from '@/stores/useKitchenStore'
+import { t } from '@/languages'
 
 const kitchenStore = useKitchenStore()
 const now = ref(Date.now())
 let refreshInterval
 let timerInterval
+let unsubscribeQueue
 
-const columns = [
-  { key: 'pending', label: 'Pending', statuses: ['pending', 'confirmed'], next: { status: 'in_progress', label: 'Start cooking' } },
-  { key: 'cooking', label: 'Cooking', statuses: ['in_progress'], next: { status: 'ready', label: 'Ready to serve' } },
-  { key: 'ready', label: 'Ready', statuses: ['ready'], next: null },
-]
+const columns = computed(() => [
+  { key: 'pending', label: t('kitchen.pending'), statuses: ['pending', 'confirmed'], next: { status: 'in_progress', label: t('kitchen.startCooking') } },
+  { key: 'cooking', label: t('kitchen.cooking'), statuses: ['in_progress'], next: { status: 'ready', label: t('kitchen.readyToServe') } },
+  { key: 'ready', label: t('kitchen.ready'), statuses: ['ready'], next: null },
+])
 
 onMounted(async () => {
   await kitchenStore.fetchQueue()
-  refreshInterval = setInterval(() => kitchenStore.fetchQueue(), 5000)
+  unsubscribeQueue = kitchenStore.subscribeToQueue({
+    onUnavailable: startPolling,
+  })
   timerInterval = setInterval(() => { now.value = Date.now() }, 1000)
 })
 
 onUnmounted(() => {
   clearInterval(refreshInterval)
   clearInterval(timerInterval)
+  unsubscribeQueue?.()
 })
+
+function startPolling() {
+  if (refreshInterval) return
+  refreshInterval = setInterval(() => kitchenStore.fetchQueue(), 5000)
+}
 
 function ordersByStatus(statuses) {
   return kitchenStore.queue.filter((order) => statuses.includes(order.status))

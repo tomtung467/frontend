@@ -1,29 +1,29 @@
 <template>
   <MasterLayout show-footer>
     <div class="tables-view">
-      <MasterPageHeader title="Quản lý bàn" />
+      <MasterPageHeader :title="t('tables.title')" />
       <div class="tables-list">
         <div v-for="table in tables" :key="table.id" class="table-card">
           <div class="table-header">
-            <h3>Bàn {{ table.table_number }}</h3>
+            <h3>{{ t('tables.table') }} {{ table.table_number }}</h3>
             <span class="status" :class="normalizedStatus(table)">{{ statusLabel(table) }}</span>
           </div>
           <div class="table-info">
-            <p><strong>Sức chứa:</strong> {{ table.capacity }} khách</p>
-            <p><strong>Khu vực:</strong> {{ table.section || 'Chung' }}</p>
-            <p v-if="table.occupied_since"><strong>Khách vào:</strong> {{ formatTime(table.occupied_since) }}</p>
-            <p v-if="table.ready_items_count"><strong>Món đã xong:</strong> {{ table.ready_items_count }}</p>
-            <p v-if="table.payment_requested_at" class="payment-alert">Khách đang gọi thanh toán</p>
+            <p><strong>{{ t('tables.capacity') }}:</strong> {{ table.capacity }} {{ t('tables.guests') }}</p>
+            <p><strong>{{ t('tables.section') }}:</strong> {{ table.section || t('tables.commonSection') }}</p>
+            <p v-if="table.occupied_since"><strong>{{ t('tables.occupiedSince') }}:</strong> {{ formatTime(table.occupied_since) }}</p>
+            <p v-if="table.ready_items_count"><strong>{{ t('tables.readyItems') }}:</strong> {{ table.ready_items_count }}</p>
+            <p v-if="table.payment_requested_at" class="payment-alert">{{ t('tables.paymentRequested') }}</p>
           </div>
           <div class="table-actions">
-            <button @click="updateStatus(table.id, 'empty')" class="btn-available">
-              Trống
+            <button class="btn-available" @click="updateStatus(table.id, 'empty')">
+              {{ t('tables.empty') }}
             </button>
-            <button @click="updateStatus(table.id, 'occupied')" class="btn-occupied">
-              Có khách
+            <button class="btn-occupied" @click="updateStatus(table.id, 'occupied')">
+              {{ t('tables.occupied') }}
             </button>
-            <button @click="updateStatus(table.id, 'reserved')" class="btn-reserved">
-              Đặt trước
+            <button class="btn-reserved" @click="updateStatus(table.id, 'reserved')">
+              {{ t('tables.reserved') }}
             </button>
           </div>
         </div>
@@ -33,41 +33,35 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { isAbortError } from '@/api/requestManager'
 import { useTableStore } from '@/stores/useTableStore'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
+import { currentLanguage, t } from '@/languages'
 
 const tableStore = useTableStore()
-const tables = ref([])
+const tables = computed(() => tableStore.tables)
+let unsubscribeTables
 
 onMounted(async () => {
   try {
     await tableStore.fetchTables({ summary: 1 })
-    tables.value = tableStore.tables
+    unsubscribeTables = tableStore.subscribeToTables()
   } catch (err) {
     if (!isAbortError(err)) throw err
   }
 })
 
+onUnmounted(() => {
+  unsubscribeTables?.()
+})
+
 async function updateStatus(tableId, status) {
   try {
     await tableStore.updateTableStatus(tableId, status)
-    const table = tables.value.find(t => t.id === tableId)
-    if (table) {
-      Object.assign(table, updatedTableShape(table, status))
-    }
   } catch (err) {
-    alert('Failed to update table status')
-  }
-}
-
-function updatedTableShape(table, status) {
-  return {
-    status,
-    occupied_since: status === 'occupied' ? table.occupied_since || new Date().toISOString() : null,
-    current_customer_count: status === 'occupied' ? table.current_customer_count || 1 : 0,
+    alert(t('tables.updateFailed'))
   }
 }
 
@@ -77,16 +71,17 @@ function normalizedStatus(table) {
 
 function statusLabel(table) {
   return {
-    empty: 'Trống',
-    available: 'Trống',
-    occupied: 'Có khách',
-    reserved: 'Đặt trước',
-    maintenance: 'Bảo trì',
+    empty: t('tables.empty'),
+    available: t('tables.available'),
+    occupied: t('tables.occupied'),
+    reserved: t('tables.reserved'),
+    maintenance: t('tables.maintenance'),
   }[table.status] || table.status
 }
 
 function formatTime(value) {
-  return value ? new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '-'
+  const locale = currentLanguage.value === 'en' ? 'en-US' : 'vi-VN'
+  return value ? new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '-'
 }
 </script>
 

@@ -2,9 +2,9 @@
   <div class="cart-view">
     <div class="container">
       <header class="customer-topbar">
-        <button @click="continueShopping" class="btn-continue compact">Back to menu</button>
-        <h1>{{ tableId ? `Current Bill - Table ${tableId}` : 'Current Bill' }}</h1>
-        <button @click="logout" class="btn-logout">Logout</button>
+        <button @click="continueShopping" class="btn-continue compact">{{ t('customer.backToMenu') }}</button>
+        <h1>{{ tableId ? t('customer.currentBillTable', { table: tableId }) : t('customer.currentBill') }}</h1>
+        <button @click="logout" class="btn-logout">{{ t('customer.logout') }}</button>
       </header>
 
       <div v-if="cartStore.items.length > 0" class="cart-content">
@@ -12,7 +12,7 @@
           <div v-for="item in cartStore.items" :key="item.food_id" class="cart-item">
             <div class="item-info">
               <h3>{{ item.food_name }}</h3>
-              <p>Price: {{ formatPrice(item.price) }}</p>
+              <p>{{ t('customer.price') }}: {{ formatPrice(item.price) }}</p>
             </div>
             <div class="item-quantity">
               <button @click="decreaseQuantity(item.food_id)">-</button>
@@ -23,43 +23,43 @@
               {{ formatPrice(item.price * item.quantity) }}
             </div>
             <button @click="removeItem(item.food_id)" class="btn-remove">
-              Remove
+              {{ t('customer.remove') }}
             </button>
           </div>
         </div>
 
         <div class="cart-summary">
-          <h2>Order Summary</h2>
+          <h2>{{ t('customer.orderSummary') }}</h2>
           <div class="summary-item">
-            <span>Items:</span>
+            <span>{{ t('kitchen.items') }}:</span>
             <span>{{ cartStore.itemCount }}</span>
           </div>
           <div class="summary-item">
-            <span>Subtotal:</span>
+            <span>{{ t('customer.subtotal') }}:</span>
             <span>{{ formatPrice(cartStore.totalPrice) }}</span>
           </div>
           <div class="summary-item">
-            <span>Tax (10%):</span>
+            <span>{{ t('customer.tax') }}:</span>
             <span>{{ formatPrice(cartStore.totalPrice * 0.1) }}</span>
           </div>
           <div class="summary-item total">
-            <span>Total:</span>
+            <span>{{ t('customer.total') }}:</span>
             <span>{{ formatPrice(cartStore.totalPrice * 1.1) }}</span>
           </div>
 
           <button @click="checkout" class="btn-checkout">
-            Send order / add to bill
+            {{ t('customer.sendOrder') }}
           </button>
           <button @click="continueShopping" class="btn-continue">
-            Continue Shopping
+            {{ t('customer.continueShopping') }}
           </button>
         </div>
       </div>
 
       <div v-else class="empty-cart">
-        <h2>Your cart is empty</h2>
+        <h2>{{ t('customer.emptyCart') }}</h2>
         <router-link :to="tableId ? `/menu/table/${tableId}` : '/menu'" class="btn-back">
-          Back to Menu
+          {{ t('customer.backToMenu') }}
         </router-link>
       </div>
     </div>
@@ -71,6 +71,7 @@ import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/useCartStore'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { currentLanguage, t } from '@/languages'
 
 const router = useRouter()
 const route = useRoute()
@@ -107,10 +108,10 @@ function continueShopping() {
 async function checkout() {
   try {
     await cartStore.checkout('card')
-    alert('Order sent. If this table already has an open bill, the items were added to it.')
+    alert(t('customer.orderSent'))
     router.push(tableId.value ? `/orders/table/${tableId.value}` : '/orders')
   } catch (err) {
-    alert('Checkout failed: ' + err.message)
+    alert(`${t('customer.checkoutFailed')}: ${err.message}`)
   }
 }
 
@@ -120,7 +121,8 @@ async function logout() {
 }
 
 function formatPrice(price) {
-  return new Intl.NumberFormat('vi-VN', {
+  const locale = currentLanguage.value === 'en' ? 'en-US' : 'vi-VN'
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: 'VND',
   }).format(price)

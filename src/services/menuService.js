@@ -81,8 +81,8 @@ export default class MenuService extends BaseService {
    * Create new food
    * @param {Object} data - { name, description, price, category_id, image_url }
    */
-  async createFood(data) {
-    return this.post('/foods', data)
+  async createFood(data, config = {}) {
+    return this.post('/foods', data, config)
   }
 
   /**
@@ -90,8 +90,13 @@ export default class MenuService extends BaseService {
    * @param {number} id - Food ID
    * @param {Object} data - { name, description, price, category_id, image_url }
    */
-  async updateFood(id, data) {
-    return this.put(`/foods/${id}`, data)
+  async updateFood(id, data, config = {}) {
+    if (data instanceof FormData) {
+      data.append('_method', 'PUT')
+      return this.post(`/foods/${id}`, data, config)
+    }
+
+    return this.put(`/foods/${id}`, data, config)
   }
 
   /**

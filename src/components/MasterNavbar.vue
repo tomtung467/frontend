@@ -5,7 +5,7 @@
     </button>
 
     <nav class="side-menu">
-      <v-tooltip v-for="item in visibleNavItems" :key="item.key" :text="item.label" location="end">
+      <v-tooltip v-for="item in visibleNavItems" :key="item.key" :text="navLabel(item)" location="end">
         <template #activator="{ props }">
           <button
             v-bind="props"
@@ -20,6 +20,7 @@
     </nav>
 
     <div class="side-bottom">
+      <MenuUser v-if="authStore.user" :user="authStore.user" variant="side" @logout="handleLogout" />
       <button class="side-nav-btn" @click="router.push('/settings')">
         <v-icon size="25">mdi-cog</v-icon>
       </button>
@@ -34,7 +35,7 @@
       </v-toolbar-title>
 
       <div v-if="!smAndDown" class="navbar-menu">
-        <v-tooltip v-for="item in visibleNavItems" :key="item.key" :text="item.label" location="bottom">
+        <v-tooltip v-for="item in visibleNavItems" :key="item.key" :text="navLabel(item)" location="bottom">
           <template #activator="{ props }">
             <v-btn
               v-bind="props"
@@ -64,7 +65,7 @@
             :prepend-icon="item.icon"
             @click="router.push(item.path)"
           >
-            <v-list-item-title>{{ item.label }}</v-list-item-title>
+            <v-list-item-title>{{ navLabel(item) }}</v-list-item-title>
           </v-list-item>
         </v-list>
       </v-menu>
@@ -106,6 +107,7 @@ import { useDisplay } from 'vuetify'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { getVisibleNavItems } from '@/config/permissions'
 import { appSettings } from '@/config/appSettings'
+import { t } from '@/languages'
 import MenuUser from './MenuUser.vue'
 
 const authStore = useAuthStore()
@@ -135,8 +137,12 @@ function goHome() {
 function handleSearch() {
   const query = searchQuery.value.trim()
   if (!query) return
-  const firstMatch = visibleNavItems.value.find((item) => item.label.toLowerCase().includes(query.toLowerCase()))
+  const firstMatch = visibleNavItems.value.find((item) => navLabel(item).toLowerCase().includes(query.toLowerCase()))
   if (firstMatch) router.push(firstMatch.path)
+}
+
+function navLabel(item) {
+  return item.labelKey ? t(item.labelKey) : item.label
 }
 
 async function handleLogout() {

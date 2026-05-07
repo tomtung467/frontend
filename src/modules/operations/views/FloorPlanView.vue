@@ -1,17 +1,17 @@
 <template>
   <MasterLayout show-footer>
     <div class="floor-plan-view">
-      <MasterPageHeader title="Sơ đồ bàn" />
+      <MasterPageHeader :title="t('tables.floorPlan')" />
       <div class="floor-plan">
-        <div v-for="table in tables" :key="table.id" class="table-item" :class="table.status">
+        <div v-for="table in tables" :key="table.id" class="table-item" :class="normalizedStatus(table)">
           <div class="table-number">{{ table.table_number }}</div>
-          <div class="table-capacity">{{ table.capacity }} seats</div>
-          <div class="table-status">{{ table.status }}</div>
-          <button v-if="table.status === 'available'" @click="selectTable(table)" class="btn-select">
-            Select
+          <div class="table-capacity">{{ table.capacity }} {{ t('tables.seats') }}</div>
+          <div class="table-status">{{ statusLabel(table.status) }}</div>
+          <button v-if="normalizedStatus(table) === 'available'" class="btn-select" @click="selectTable(table)">
+            {{ t('tables.select') }}
           </button>
           <button v-else class="btn-occupied" disabled>
-            Occupied
+            {{ t('tables.occupied') }}
           </button>
         </div>
       </div>
@@ -20,24 +20,38 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTableStore } from '@/stores/useTableStore'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
+import { t } from '@/languages'
 
 const router = useRouter()
 const tableStore = useTableStore()
-const tables = ref([])
+const tables = computed(() => tableStore.tables)
+let unsubscribeTables
 
 onMounted(async () => {
   await tableStore.fetchTables()
-  tables.value = tableStore.tables
+  unsubscribeTables = tableStore.subscribeToTables()
+})
+
+onUnmounted(() => {
+  unsubscribeTables?.()
 })
 
 function selectTable(table) {
   tableStore.selectTable(table)
   router.push('/menu')
+}
+
+function normalizedStatus(table) {
+  return table.status === 'empty' ? 'available' : table.status
+}
+
+function statusLabel(status) {
+  return t(`tables.${status}`)
 }
 </script>
 

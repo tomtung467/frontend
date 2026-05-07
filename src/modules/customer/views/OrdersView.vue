@@ -1,64 +1,64 @@
 <template>
   <MasterLayout show-footer>
     <main class="orders-page">
-      <MasterPageHeader title="Đơn của tôi">
+      <MasterPageHeader :title="t('customer.myOrders')">
         <template #actions>
-          <router-link :to="tableId ? `/menu/table/${tableId}` : '/menu'" class="ghost-action">Gọi thêm món</router-link>
-          <button @click="loadOrders" class="ghost-action">Làm mới</button>
+          <router-link :to="tableId ? `/menu/table/${tableId}` : '/menu'" class="ghost-action">{{ t('customer.orderMore') }}</router-link>
+          <button class="ghost-action" @click="loadOrders">{{ t('customer.refresh') }}</button>
         </template>
       </MasterPageHeader>
 
       <section class="summary-row">
         <article>
-          <span>Đơn đang xử lý</span>
+          <span>{{ t('customer.activeOrders') }}</span>
           <strong>{{ activeOrders.length }}</strong>
         </article>
         <article>
-          <span>Sẵn sàng phục vụ</span>
+          <span>{{ t('customer.readyToServe') }}</span>
           <strong>{{ readyOrders.length }}</strong>
         </article>
         <article>
-          <span>Đã gọi thanh toán</span>
+          <span>{{ t('customer.paymentRequested') }}</span>
           <strong>{{ paymentRequested }}</strong>
         </article>
       </section>
 
-      <p v-if="loading" class="state">Đang tải đơn hàng...</p>
+      <p v-if="loading" class="state">{{ t('customer.loadingOrders') }}</p>
       <p v-else-if="error" class="state error">{{ error }}</p>
       <section v-else-if="orders.length" class="orders-list">
         <article v-for="order in orders" :key="order.id" class="order-card">
           <header>
             <div>
-              <h2>{{ order.order_number || `Đơn #${order.id}` }}</h2>
-              <p>Bàn {{ order.table_id }} · {{ formatDate(order.created_at) }}</p>
+              <h2>{{ order.order_number || `${t('kitchen.order')} #${order.id}` }}</h2>
+              <p>{{ t('kitchen.table') }} {{ order.table_id }} · {{ formatDate(order.created_at) }}</p>
             </div>
             <span class="status" :class="order.status">{{ statusLabel(order.status) }}</span>
           </header>
 
           <div class="order-body">
             <div>
-              <h3>Món đã gọi</h3>
+              <h3>{{ t('customer.orderedItems') }}</h3>
               <ul v-if="orderItems(order).length">
                 <li v-for="item in orderItems(order)" :key="item.id || item.food_id">
-                  <span>{{ item.food?.name || item.food_name || item.name || `Món #${item.food_id}` }}</span>
+                  <span>{{ item.food?.name || item.food_name || item.name || `${t('menu.title')} #${item.food_id}` }}</span>
                   <strong>x{{ item.quantity }}</strong>
                 </li>
               </ul>
-              <p v-else class="muted">Đơn này chưa có chi tiết món.</p>
+              <p v-else class="muted">{{ t('customer.noDetails') }}</p>
             </div>
 
             <aside>
-              <span>Tổng tiền</span>
+              <span>{{ t('customer.total') }}</span>
               <strong>{{ formatPrice(order.total_price || order.total_amount) }}</strong>
               <button
                 v-if="canRequestPayment(order)"
                 class="primary-action"
                 @click="requestPayment(order)"
               >
-                Gọi nhân viên thanh toán
+                {{ t('customer.requestPayment') }}
               </button>
               <p v-else-if="order.payment_requested_at" class="success-note">
-                Nhân viên đã nhận yêu cầu thanh toán.
+                {{ t('customer.paymentAccepted') }}
               </p>
             </aside>
           </div>
@@ -66,19 +66,20 @@
       </section>
 
       <section v-else class="state empty">
-        <h2>Chưa có đơn hàng</h2>
-        <router-link :to="tableId ? `/menu/table/${tableId}` : '/menu'" class="primary-link">Xem thực đơn</router-link>
+        <h2>{{ t('customer.noOrders') }}</h2>
+        <router-link :to="tableId ? `/menu/table/${tableId}` : '/menu'" class="primary-link">{{ t('customer.viewMenu') }}</router-link>
       </section>
     </main>
   </MasterLayout>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { useOrderStore } from '@/stores/useOrderStore'
+import { currentLanguage, t } from '@/languages'
 
 const orderStore = useOrderStore()
 const route = useRoute()
@@ -90,8 +91,16 @@ const orders = computed(() => Array.isArray(orderStore.orders) ? orderStore.orde
 const activeOrders = computed(() => orders.value.filter((order) => ['pending', 'confirmed', 'in_progress'].includes(order.status)))
 const readyOrders = computed(() => orders.value.filter((order) => ['ready', 'served'].includes(order.status)))
 const paymentRequested = computed(() => orders.value.filter((order) => order.payment_requested_at).length)
+let unsubscribeOrders
 
-onMounted(loadOrders)
+onMounted(async () => {
+  await loadOrders()
+  unsubscribeOrders = orderStore.subscribeToOrders(tableId.value ? { tableId: tableId.value } : {})
+})
+
+onUnmounted(() => {
+  unsubscribeOrders?.()
+})
 
 async function loadOrders() {
   loading.value = true
@@ -99,7 +108,7 @@ async function loadOrders() {
   try {
     await orderStore.fetchOrders(tableId.value ? { table_id: tableId.value } : {})
   } catch (err) {
-    error.value = err.message || 'Không thể tải đơn hàng.'
+    error.value = err.message || t('customer.loadingOrders')
   } finally {
     loading.value = false
   }
@@ -117,28 +126,22 @@ async function requestPayment(order) {
   try {
     await orderStore.requestPayment(order.id)
   } catch (err) {
-    error.value = err.message || 'Không thể gửi yêu cầu thanh toán.'
+    error.value = err.message || t('customer.reservationFailed')
   }
 }
 
 function statusLabel(status) {
-  return {
-    pending: 'Chờ xác nhận',
-    confirmed: 'Đã nhận',
-    in_progress: 'Đang làm',
-    ready: 'Đã xong',
-    served: 'Đã phục vụ',
-    paid: 'Đã thanh toán',
-    cancelled: 'Đã hủy',
-  }[status] || status
+  return t(`status.${status}`)
 }
 
 function formatPrice(price) {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(price || 0))
+  const locale = currentLanguage.value === 'en' ? 'en-US' : 'vi-VN'
+  return new Intl.NumberFormat(locale, { style: 'currency', currency: 'VND' }).format(Number(price || 0))
 }
 
 function formatDate(date) {
-  return date ? new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(date)) : '-'
+  const locale = currentLanguage.value === 'en' ? 'en-US' : 'vi-VN'
+  return date ? new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(date)) : '-'
 }
 </script>
 

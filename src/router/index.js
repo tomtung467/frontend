@@ -173,7 +173,7 @@ const routes = [
     path: "/settings",
     name: "Settings",
     component: () => import("@/modules/auth/view/SettingsView.vue"),
-    meta: { requiresAuth: true, permission: "settings" },
+    meta: { requiresAuth: true },
   },
   {
     path: "/change-password",

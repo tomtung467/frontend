@@ -9,20 +9,20 @@ export const ROLES = [
 ]
 
 export const NAV_ITEMS = [
-  { key: 'customer-menu', label: 'Menu gọi món', icon: 'mdi-silverware-fork-knife', path: '/menu', roles: ['customer'] },
-  { key: 'customer-cart', label: 'Giỏ món', icon: 'mdi-cart', path: '/cart', roles: ['customer'] },
-  { key: 'customer-orders', label: 'Đơn của tôi', icon: 'mdi-clipboard-text-clock', path: '/orders', roles: ['customer'] },
-  { key: 'dashboard', label: 'Dashboard', icon: 'mdi-chart-box', path: '/dashboard', roles: ['manager', 'admin'] },
-  { key: 'orders', label: 'Orders', icon: 'mdi-clipboard-list', path: '/orders', roles: ['staff', 'manager', 'admin'] },
-  { key: 'kitchen', label: 'Kitchen', icon: 'mdi-chef-hat', path: '/kitchen', roles: ['chef', 'admin'] },
-  { key: 'tables', label: 'Tables', icon: 'mdi-table-furniture', path: '/tables', roles: ['staff', 'manager', 'admin'] },
-  { key: 'menu-management', label: 'Menu', icon: 'mdi-food', path: '/menu-management', roles: ['manager', 'admin'] },
-  { key: 'inventory', label: 'Inventory', icon: 'mdi-package-variant', path: '/inventory', roles: ['manager', 'chef', 'admin'] },
-  { key: 'employees', label: 'Employees', icon: 'mdi-account-group', path: '/employees', roles: ['manager', 'admin'] },
-  { key: 'payments', label: 'Payments', icon: 'mdi-cash-register', path: '/payments', roles: ['staff', 'manager', 'admin'] },
-  { key: 'invoices', label: 'Invoices', icon: 'mdi-receipt-text', path: '/invoices', roles: ['staff', 'manager', 'admin'] },
-  { key: 'reports', label: 'Reports', icon: 'mdi-chart-line', path: '/reports', roles: ['manager', 'admin'] },
-  { key: 'settings', label: 'Settings', icon: 'mdi-cog', path: '/settings', roles: ['admin'] },
+  { key: 'customer-menu', labelKey: 'nav.customerMenu', icon: 'mdi-silverware-fork-knife', path: '/menu', roles: ['customer'] },
+  { key: 'customer-cart', labelKey: 'nav.customerCart', icon: 'mdi-cart', path: '/cart', roles: ['customer'] },
+  { key: 'customer-orders', labelKey: 'nav.customerOrders', icon: 'mdi-clipboard-text-clock', path: '/orders', roles: ['customer'] },
+  { key: 'dashboard', labelKey: 'nav.dashboard', icon: 'mdi-chart-box', path: '/dashboard', roles: ['manager', 'admin'] },
+  { key: 'orders', labelKey: 'nav.orders', icon: 'mdi-clipboard-list', path: '/orders', roles: ['staff', 'manager', 'admin'] },
+  { key: 'kitchen', labelKey: 'nav.kitchen', icon: 'mdi-chef-hat', path: '/kitchen', roles: ['chef', 'admin'] },
+  { key: 'tables', labelKey: 'nav.tables', icon: 'mdi-table-furniture', path: '/tables', roles: ['staff', 'manager', 'admin'] },
+  { key: 'menu-management', labelKey: 'nav.menuManagement', icon: 'mdi-food', path: '/menu-management', roles: ['manager', 'admin'] },
+  { key: 'inventory', labelKey: 'nav.inventory', icon: 'mdi-package-variant', path: '/inventory', roles: ['manager', 'chef', 'admin'] },
+  { key: 'employees', labelKey: 'nav.employees', icon: 'mdi-account-group', path: '/employees', roles: ['manager', 'admin'] },
+  { key: 'payments', labelKey: 'nav.payments', icon: 'mdi-cash-register', path: '/payments', roles: ['staff', 'manager', 'admin'] },
+  { key: 'invoices', labelKey: 'nav.invoices', icon: 'mdi-receipt-text', path: '/invoices', roles: ['staff', 'manager', 'admin'] },
+  { key: 'reports', labelKey: 'nav.reports', icon: 'mdi-chart-line', path: '/reports', roles: ['manager', 'admin'] },
+  { key: 'settings', labelKey: 'nav.settings', icon: 'mdi-cog', path: '/settings', roles: ['customer', 'staff', 'chef', 'manager', 'admin'] },
 ]
 
 export function getDefaultPermissions() {

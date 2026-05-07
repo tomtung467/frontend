@@ -1,62 +1,62 @@
 <template>
   <MasterLayout show-footer>
     <main class="ops-page">
-      <MasterPageHeader title="Nhân sự">
+      <MasterPageHeader :title="t('hr.employees')">
         <template #actions>
-          <button class="ghost-action" @click="loadEmployees">Làm mới</button>
+          <button class="ghost-action" @click="loadEmployees">{{ t('hr.refresh') }}</button>
         </template>
       </MasterPageHeader>
 
       <form class="inline-form" @submit.prevent="createEmployee">
-        <input v-model="form.first_name" required placeholder="First name" />
-        <input v-model="form.last_name" required placeholder="Last name" />
-        <input v-model="form.email" required type="email" placeholder="Login email" />
-        <input v-model="form.position" required placeholder="Position" />
+        <input v-model="form.first_name" required :placeholder="t('hr.firstName')" />
+        <input v-model="form.last_name" required :placeholder="t('hr.lastName')" />
+        <input v-model="form.email" required type="email" :placeholder="t('hr.loginEmail')" />
+        <input v-model="form.position" required :placeholder="t('hr.position')" />
         <select v-model="form.department_id">
-          <option value="">No department</option>
+          <option value="">{{ t('hr.noDepartment') }}</option>
           <option v-for="department in departments" :key="department.id" :value="department.id">{{ department.name }}</option>
         </select>
         <select v-model="form.role">
-          <option value="staff">Staff</option>
-          <option value="chef">Chef</option>
-          <option value="manager">Manager</option>
+          <option value="staff">{{ t('hr.staff') }}</option>
+          <option value="chef">{{ t('hr.chef') }}</option>
+          <option value="manager">{{ t('hr.manager') }}</option>
         </select>
-        <input v-model.number="form.salary" required type="number" step="100000" placeholder="Salary" />
+        <input v-model.number="form.salary" required type="number" step="100000" :placeholder="t('hr.salary')" />
         <input v-model="form.hire_date" required type="date" />
-        <button class="primary-action" :disabled="saving">{{ saving ? 'Saving...' : 'Add employee' }}</button>
+        <button class="primary-action" :disabled="saving">{{ saving ? t('menu.saving') : t('hr.addEmployee') }}</button>
       </form>
 
       <section class="summary-strip">
-        <div class="metric"><span>Total</span><strong>{{ employees.length }}</strong></div>
-        <div class="metric"><span>Active</span><strong>{{ countByStatus('active') }}</strong></div>
-        <div class="metric warning"><span>On leave</span><strong>{{ countByStatus('on_leave') }}</strong></div>
+        <div class="metric"><span>{{ t('hr.total') }}</span><strong>{{ employees.length }}</strong></div>
+        <div class="metric"><span>{{ t('hr.active') }}</span><strong>{{ countByStatus('active') }}</strong></div>
+        <div class="metric warning"><span>{{ t('hr.onLeave') }}</span><strong>{{ countByStatus('on_leave') }}</strong></div>
       </section>
 
       <section class="toolbar">
-        <input v-model="search" type="search" placeholder="Search employee, position or department" />
+        <input v-model="search" type="search" :placeholder="t('hr.search')" />
         <select v-model="statusFilter">
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="on_leave">On leave</option>
-          <option value="terminated">Terminated</option>
+          <option value="">{{ t('hr.allStatuses') }}</option>
+          <option value="active">{{ t('hr.active') }}</option>
+          <option value="inactive">{{ t('hr.inactive') }}</option>
+          <option value="on_leave">{{ t('hr.onLeave') }}</option>
+          <option value="terminated">{{ t('hr.terminated') }}</option>
         </select>
       </section>
 
       <p v-if="error" class="state error">{{ error }}</p>
-      <p v-else-if="loading" class="state">Loading employees...</p>
-      <p v-else-if="filteredEmployees.length === 0" class="state">No employees found.</p>
+      <p v-else-if="loading" class="state">{{ t('hr.loading') }}</p>
+      <p v-else-if="filteredEmployees.length === 0" class="state">{{ t('hr.noEmployees') }}</p>
 
       <div v-else class="data-table">
         <table>
           <thead>
             <tr>
-              <th>Employee</th>
-              <th>Department</th>
-              <th>Position</th>
-              <th>Hire date</th>
-              <th>Salary</th>
-              <th>Status</th>
+              <th>{{ t('hr.employee') }}</th>
+              <th>{{ t('hr.department') }}</th>
+              <th>{{ t('hr.position') }}</th>
+              <th>{{ t('hr.hireDate') }}</th>
+              <th>{{ t('hr.salary') }}</th>
+              <th>{{ t('inventory.status') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -65,16 +65,16 @@
                 <strong>{{ employeeName(employee) }}</strong>
                 <small>{{ employee.employee_id_number || employee.employee_code || employee.user?.email }}</small>
               </td>
-              <td>{{ employee.department?.name || 'Unassigned' }}</td>
+              <td>{{ employee.department?.name || t('hr.unassigned') }}</td>
               <td>{{ employee.position }}</td>
               <td>{{ formatDate(employee.hire_date) }}</td>
               <td>{{ formatCurrency(employee.salary) }}</td>
               <td>
                 <select class="status-select" :value="employee.status" @change="updateStatus(employee, $event.target.value)">
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="on_leave">On leave</option>
-                  <option value="terminated">Terminated</option>
+                  <option value="active">{{ t('hr.active') }}</option>
+                  <option value="inactive">{{ t('hr.inactive') }}</option>
+                  <option value="on_leave">{{ t('hr.onLeave') }}</option>
+                  <option value="terminated">{{ t('hr.terminated') }}</option>
                 </select>
               </td>
             </tr>
@@ -90,6 +90,7 @@ import { computed, onMounted, ref } from 'vue'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { employeeService } from '@/services'
+import { currentLanguage, t } from '@/languages'
 
 const employees = ref([])
 const departments = ref([])
@@ -137,7 +138,7 @@ async function loadEmployees() {
     employees.value = employeeList
     departments.value = departmentList
   } catch (err) {
-    error.value = err.message || 'Failed to load employees.'
+    error.value = err.message || t('hr.failedLoad')
   } finally {
     loading.value = false
   }
@@ -166,7 +167,7 @@ async function createEmployee() {
     }
     await loadEmployees()
   } catch (err) {
-    error.value = err.message || 'Failed to create employee.'
+    error.value = err.message || t('hr.failedCreate')
   } finally {
     saving.value = false
   }
@@ -180,27 +181,31 @@ async function updateStatus(employee, status) {
     await employeeService.updateEmployeeStatus(employee.id, status)
     employee.status = status
   } catch (err) {
-    error.value = err.message || 'Failed to update status.'
+    error.value = err.message || t('hr.failedUpdate')
   } finally {
     saving.value = false
   }
 }
 
 function employeeName(employee) {
-  return [employee.first_name, employee.last_name].filter(Boolean).join(' ') || employee.user?.name || 'Unnamed employee'
+  return [employee.first_name, employee.last_name].filter(Boolean).join(' ') || employee.user?.name || t('hr.unnamed')
 }
 
 function countByStatus(status) {
   return employees.value.filter((employee) => employee.status === status).length
 }
 
+function locale() {
+  return currentLanguage.value === 'en' ? 'en-US' : 'vi-VN'
+}
+
 function formatCurrency(value) {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value || 0))
+  return new Intl.NumberFormat(locale(), { style: 'currency', currency: 'VND' }).format(Number(value || 0))
 }
 
 function formatDate(value) {
   if (!value) return '-'
-  return new Intl.DateTimeFormat('vi-VN').format(new Date(value))
+  return new Intl.DateTimeFormat(locale()).format(new Date(value))
 }
 </script>
 

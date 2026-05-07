@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api from '@/api'
+import { syncOrderFirestore } from '@/services/firebaseFirestoreService'
 
 export const useCartStore = defineStore('cart', () => {
   const carts = ref(JSON.parse(localStorage.getItem('table_carts') || '{}'))
@@ -71,6 +72,8 @@ export const useCartStore = defineStore('cart', () => {
         payment_method: paymentMethod,
         total_price: totalPrice.value,
       })
+      const order = response.data?.data || response.data
+      await syncOrderFirestore(order)
       clearCart()
       return response.data
     } catch (err) {

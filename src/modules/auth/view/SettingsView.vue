@@ -1,9 +1,11 @@
 <template>
   <MasterLayout>
     <main class="settings-page">
-      <MasterPageHeader title="Cài đặt">
+      <MasterPageHeader :title="t('settings.title')">
         <template #actions>
-          <button class="primary-action" @click="savePermissions">Lưu phân quyền</button>
+          <button class="primary-action" @click="saveSettings">
+            {{ isAdmin ? t('common.savePermissions') : t('common.saveSettings') }}
+          </button>
         </template>
       </MasterPageHeader>
 
@@ -21,25 +23,26 @@
         </aside>
 
         <section v-if="activeTab === 'general'" class="panel">
-          <h2>General</h2>
+          <h2>{{ t('settings.general') }}</h2>
           <div class="form-grid">
             <label>
-              Language
-              <select v-model="generalSettings.language">
-                <option value="vi">Vietnamese</option>
-                <option value="en">English</option>
+              {{ t('settings.language') }}
+              <select v-model="generalSettings.language" @change="saveGeneralSettings">
+                <option v-for="language in languageOptions" :key="language.value" :value="language.value">
+                  {{ t(language.labelKey) }}
+                </option>
               </select>
             </label>
             <label>
-              Theme
+              {{ t('settings.theme') }}
               <select v-model="generalSettings.theme">
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-                <option value="auto">Auto</option>
+                <option value="light">{{ t('settings.light') }}</option>
+                <option value="dark">{{ t('settings.dark') }}</option>
+                <option value="auto">{{ t('settings.auto') }}</option>
               </select>
             </label>
             <label>
-              Date format
+              {{ t('settings.dateFormat') }}
               <select v-model="generalSettings.date_format">
                 <option>DD/MM/YYYY</option>
                 <option>MM/DD/YYYY</option>
@@ -47,38 +50,39 @@
               </select>
             </label>
             <label>
-              Thanh điều hướng
+              {{ t('settings.navigation') }}
               <select v-model="generalSettings.nav_layout" @change="saveGeneralSettings">
-                <option value="top">Ngang phía trên</option>
-                <option value="side">Dọc bên trái</option>
+                <option value="top">{{ t('settings.topBar') }}</option>
+                <option value="side">{{ t('settings.leftSidebar') }}</option>
               </select>
             </label>
           </div>
+          <p v-if="message && !isAdmin" class="message">{{ message }}</p>
         </section>
 
-        <section v-if="activeTab === 'permissions'" class="panel">
+        <section v-if="isAdmin && activeTab === 'permissions'" class="panel">
           <div class="panel-title">
             <div>
-              <h2>Role permissions</h2>
-              <p>Control which roles can access each navbar tab.</p>
+              <h2>{{ t('settings.rolePermissions') }}</h2>
+              <p>{{ t('settings.permissionsDescription') }}</p>
             </div>
-            <button class="ghost-action" @click="resetPermissions">Reset defaults</button>
+            <button class="ghost-action" @click="resetPermissions">{{ t('common.resetDefaults') }}</button>
           </div>
 
           <div class="permission-table">
             <table>
               <thead>
                 <tr>
-                  <th>Tab</th>
+                  <th>{{ t('settings.tab') }}</th>
                   <th v-for="role in editableRoles" :key="role.key">{{ role.label }}</th>
-                  <th>Admin</th>
+                  <th>{{ t('settings.admin') }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="item in NAV_ITEMS" :key="item.key">
                   <td>
                     <v-icon size="18">{{ item.icon }}</v-icon>
-                    <strong>{{ item.label }}</strong>
+                    <strong>{{ navLabel(item) }}</strong>
                     <small>{{ item.path }}</small>
                   </td>
                   <td v-for="role in editableRoles" :key="role.key">
@@ -89,7 +93,7 @@
                     />
                   </td>
                   <td>
-                    <span class="always-on">Full</span>
+                    <span class="always-on">{{ t('settings.full') }}</span>
                   </td>
                 </tr>
               </tbody>
@@ -98,12 +102,12 @@
           <p v-if="message" class="message">{{ message }}</p>
         </section>
 
-        <section v-if="activeTab === 'security'" class="panel">
-          <h2>Security</h2>
+        <section v-if="isAdmin && activeTab === 'security'" class="panel">
+          <h2>{{ t('settings.security') }}</h2>
           <div class="toggle-list">
-            <label><input v-model="securitySettings.two_factor_enabled" type="checkbox" /> Two-factor authentication</label>
-            <label><input v-model="securitySettings.audit_log" type="checkbox" /> Audit important actions</label>
-            <label><input v-model="securitySettings.force_strong_passwords" type="checkbox" /> Strong password policy</label>
+            <label><input v-model="securitySettings.two_factor_enabled" type="checkbox" /> {{ t('settings.twoFactor') }}</label>
+            <label><input v-model="securitySettings.audit_log" type="checkbox" /> {{ t('settings.auditLog') }}</label>
+            <label><input v-model="securitySettings.force_strong_passwords" type="checkbox" /> {{ t('settings.strongPasswords') }}</label>
           </div>
         </section>
       </div>
@@ -112,10 +116,12 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
+import { useAuthStore } from '@/stores/useAuthStore'
 import { appSettings, saveAppSettings } from '@/config/appSettings'
+import { languageOptions, t } from '@/languages'
 import {
   NAV_ITEMS,
   ROLES,
@@ -127,17 +133,21 @@ import {
 const activeTab = ref('general')
 const matrix = reactive(getPermissionMatrix())
 const message = ref('')
+const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.user?.role === 'admin')
 
-const settingsMenu = [
-  { id: 'general', title: 'General', icon: 'mdi-cog' },
-  { id: 'permissions', title: 'Permissions', icon: 'mdi-account-key' },
-  { id: 'security', title: 'Security', icon: 'mdi-shield-lock' },
-]
+const settingsMenu = computed(() => [
+  { id: 'general', title: t('settings.general'), icon: 'mdi-cog' },
+  ...(isAdmin.value ? [
+    { id: 'permissions', title: t('settings.permissions'), icon: 'mdi-account-key' },
+    { id: 'security', title: t('settings.security'), icon: 'mdi-shield-lock' },
+  ] : []),
+])
 
 const editableRoles = computed(() => ROLES.filter((role) => role.key !== 'admin' && role.key !== 'customer'))
 
 const generalSettings = reactive({
-  language: 'vi',
+  language: appSettings.language,
   theme: 'light',
   date_format: 'DD/MM/YYYY',
   nav_layout: appSettings.navLayout,
@@ -149,7 +159,15 @@ const securitySettings = reactive({
   force_strong_passwords: true,
 })
 
+watch(isAdmin, (canManage) => {
+  if (!canManage && activeTab.value !== 'general') {
+    activeTab.value = 'general'
+  }
+}, { immediate: true })
+
 function togglePermission(permissionKey, roleKey) {
+  if (!isAdmin.value) return
+
   const current = new Set(matrix[permissionKey] || [])
   if (current.has(roleKey)) {
     current.delete(roleKey)
@@ -161,19 +179,40 @@ function togglePermission(permissionKey, roleKey) {
 }
 
 function savePermissions() {
+  if (!isAdmin.value) return
+
   savePermissionMatrix(matrix)
   saveGeneralSettings()
-  message.value = 'Permissions saved. Navbar access updates immediately.'
+  message.value = t('common.permissionsSaved')
+}
+
+function saveSettings() {
+  if (isAdmin.value) {
+    savePermissions()
+    return
+  }
+
+  saveGeneralSettings()
+  message.value = t('common.settingsSaved')
 }
 
 function saveGeneralSettings() {
-  saveAppSettings({ navLayout: generalSettings.nav_layout })
+  saveAppSettings({
+    language: generalSettings.language,
+    navLayout: generalSettings.nav_layout,
+  })
 }
 
 function resetPermissions() {
+  if (!isAdmin.value) return
+
   resetPermissionMatrix()
   Object.assign(matrix, getPermissionMatrix())
-  message.value = 'Permissions reset to defaults.'
+  message.value = t('common.permissionsReset')
+}
+
+function navLabel(item) {
+  return item.labelKey ? t(item.labelKey) : item.label
 }
 </script>
 

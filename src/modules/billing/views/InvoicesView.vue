@@ -1,54 +1,54 @@
 <template>
   <MasterLayout show-footer>
     <main class="ops-page">
-      <MasterPageHeader title="Hóa đơn">
+      <MasterPageHeader :title="t('billing.invoices')">
         <template #actions>
-          <button class="ghost-action" @click="loadInvoices">Làm mới</button>
+          <button class="ghost-action" @click="loadInvoices">{{ t('billing.refresh') }}</button>
         </template>
       </MasterPageHeader>
 
-      <section class="current-bills" v-if="currentBills.length">
+      <section v-if="currentBills.length" class="current-bills">
         <article v-for="bill in currentBills" :key="bill.id" class="bill-card" :class="{ alert: bill.payment_requested_at }">
           <div>
-            <strong>Bàn {{ bill.table?.table_number || bill.table_id }}</strong>
+            <strong>{{ t('billing.table') }} {{ bill.table?.table_number || bill.table_id }}</strong>
             <span>{{ bill.order_number }} · {{ bill.status }}</span>
           </div>
           <div>
-            <span>Tạm tính</span>
+            <span>{{ t('billing.subtotal') }}</span>
             <strong>{{ formatCurrency(bill.total_price) }}</strong>
           </div>
-          <em v-if="bill.payment_requested_at">Khách gọi thanh toán</em>
+          <em v-if="bill.payment_requested_at">{{ t('billing.customerPayment') }}</em>
         </article>
       </section>
 
       <section class="toolbar">
-        <input v-model="search" type="search" placeholder="Search invoice, order or payment" />
+        <input v-model="search" type="search" :placeholder="t('billing.searchInvoice')" />
         <select v-model="statusFilter">
-          <option value="">All statuses</option>
-          <option value="draft">Draft</option>
-          <option value="issued">Issued</option>
-          <option value="paid">Paid</option>
-          <option value="overdue">Overdue</option>
-          <option value="cancelled">Cancelled</option>
+          <option value="">{{ t('billing.allStatuses') }}</option>
+          <option value="draft">{{ t('billing.draft') }}</option>
+          <option value="issued">{{ t('billing.issued') }}</option>
+          <option value="paid">{{ t('billing.paid') }}</option>
+          <option value="overdue">{{ t('billing.overdue') }}</option>
+          <option value="cancelled">{{ t('billing.cancelled') }}</option>
         </select>
       </section>
 
       <p v-if="error" class="state error">{{ error }}</p>
-      <p v-else-if="loading" class="state">Loading invoices...</p>
-      <p v-else-if="filteredInvoices.length === 0" class="state">No invoices found.</p>
+      <p v-else-if="loading" class="state">{{ t('billing.loadingInvoices') }}</p>
+      <p v-else-if="filteredInvoices.length === 0" class="state">{{ t('billing.noInvoices') }}</p>
 
       <div v-else class="data-table">
         <table>
           <thead>
             <tr>
-              <th>Invoice</th>
-              <th>Payment</th>
-              <th>Subtotal</th>
-              <th>Tax</th>
-              <th>Discount</th>
-              <th>Total</th>
-              <th>Status</th>
-              <th>Issued</th>
+              <th>{{ t('billing.invoice') }}</th>
+              <th>{{ t('billing.payment') }}</th>
+              <th>{{ t('billing.subtotal') }}</th>
+              <th>{{ t('billing.tax') }}</th>
+              <th>{{ t('billing.discount') }}</th>
+              <th>{{ t('billing.total') }}</th>
+              <th>{{ t('billing.status') }}</th>
+              <th>{{ t('billing.issued') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -74,6 +74,7 @@ import { computed, onMounted, ref } from 'vue'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { paymentService } from '@/services'
+import { currentLanguage, t } from '@/languages'
 
 const invoices = ref([])
 const currentBills = ref([])
@@ -99,18 +100,22 @@ async function loadInvoices() {
     invoices.value = await paymentService.getInvoices()
     currentBills.value = await paymentService.getCurrentBills()
   } catch (err) {
-    error.value = err.message || 'Failed to load invoices.'
+    error.value = err.message || t('billing.failedInvoices')
   } finally {
     loading.value = false
   }
 }
 
+function locale() {
+  return currentLanguage.value === 'en' ? 'en-US' : 'vi-VN'
+}
+
 function formatCurrency(value) {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value || 0))
+  return new Intl.NumberFormat(locale(), { style: 'currency', currency: 'VND' }).format(Number(value || 0))
 }
 
 function formatDate(value) {
-  return value ? new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : '-'
+  return value ? new Intl.DateTimeFormat(locale(), { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : '-'
 }
 </script>
 

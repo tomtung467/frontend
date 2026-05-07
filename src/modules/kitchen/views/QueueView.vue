@@ -1,35 +1,35 @@
 <template>
   <MasterLayout show-footer>
     <main class="queue-page">
-      <MasterPageHeader title="Hàng đợi bếp">
+      <MasterPageHeader :title="t('kitchen.queue')">
         <template #actions>
-          <router-link to="/kitchen" class="primary-action">Bảng bếp</router-link>
+          <router-link to="/kitchen" class="primary-action">{{ t('kitchen.board') }}</router-link>
         </template>
       </MasterPageHeader>
 
       <p v-if="kitchenStore.error" class="state error">{{ kitchenStore.error }}</p>
-      <p v-else-if="kitchenStore.loading" class="state">Loading queue...</p>
+      <p v-else-if="kitchenStore.loading" class="state">{{ t('kitchen.loadingQueue') }}</p>
 
       <div v-else class="data-table">
         <table>
           <thead>
             <tr>
-              <th>Order</th>
-              <th>Table</th>
-              <th>Items</th>
-              <th>Status</th>
-              <th>Updated</th>
+              <th>{{ t('kitchen.order') }}</th>
+              <th>{{ t('kitchen.table') }}</th>
+              <th>{{ t('kitchen.items') }}</th>
+              <th>{{ t('kitchen.status') }}</th>
+              <th>{{ t('kitchen.updated') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="kitchenStore.queue.length === 0">
-              <td colspan="5" class="empty">No active kitchen tickets.</td>
+              <td colspan="5" class="empty">{{ t('kitchen.noKitchenTickets') }}</td>
             </tr>
             <tr v-for="order in kitchenStore.queue" :key="order.id">
               <td>{{ order.order_number || `#${order.id}` }}</td>
               <td>{{ order.table_id }}</td>
               <td>{{ orderItems(order).length }}</td>
-              <td><span class="badge">{{ order.status }}</span></td>
+              <td><span class="badge">{{ statusLabel(order.status) }}</span></td>
               <td>{{ formatDate(order.updated_at) }}</td>
             </tr>
           </tbody>
@@ -40,21 +40,44 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { useKitchenStore } from '@/stores/useKitchenStore'
+import { currentLanguage, t } from '@/languages'
 
 const kitchenStore = useKitchenStore()
+let refreshInterval
+let unsubscribeQueue
 
-onMounted(() => kitchenStore.fetchQueue())
+onMounted(async () => {
+  await kitchenStore.fetchQueue()
+  unsubscribeQueue = kitchenStore.subscribeToQueue({
+    onUnavailable: startPolling,
+  })
+})
+
+onUnmounted(() => {
+  clearInterval(refreshInterval)
+  unsubscribeQueue?.()
+})
+
+function startPolling() {
+  if (refreshInterval) return
+  refreshInterval = setInterval(() => kitchenStore.fetchQueue(), 5000)
+}
 
 function orderItems(order) {
   return order.order_items || order.orderItems || order.items || []
 }
 
+function statusLabel(status) {
+  return t(`status.${status}`)
+}
+
 function formatDate(value) {
-  return value ? new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : '-'
+  const locale = currentLanguage.value === 'en' ? 'en-US' : 'vi-VN'
+  return value ? new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : '-'
 }
 </script>
 

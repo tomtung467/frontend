@@ -2,6 +2,11 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '@/api'
 import { isAbortError } from '@/api/requestManager'
+import {
+  subscribeFirestoreList,
+  syncOrderFirestore,
+  syncOrdersFirestore,
+} from '@/services/firebaseFirestoreService'
 
 export const useOrderStore = defineStore('order', () => {
   const orders = ref([])
@@ -16,6 +21,7 @@ export const useOrderStore = defineStore('order', () => {
       const params = new URLSearchParams(filters)
       const response = await api.get(`/orders?${params.toString()}`)
       orders.value = response.data?.data?.data || response.data?.data || response.data
+      await syncOrdersFirestore(Array.isArray(orders.value) ? orders.value : [])
     } catch (err) {
       if (isAbortError(err)) throw err
       error.value = 'Failed to fetch orders'
@@ -32,6 +38,7 @@ export const useOrderStore = defineStore('order', () => {
       const response = await api.post('/orders', data)
       currentOrder.value = response.data?.data || response.data
       orders.value.push(currentOrder.value)
+      await syncOrderFirestore(currentOrder.value)
       return currentOrder.value
     } catch (err) {
       if (isAbortError(err)) throw err
@@ -56,6 +63,7 @@ export const useOrderStore = defineStore('order', () => {
       if (currentOrder.value?.id === orderId) {
         currentOrder.value = updated
       }
+      await syncOrderFirestore(updated)
       return updated
     } catch (err) {
       if (isAbortError(err)) throw err
@@ -83,7 +91,18 @@ export const useOrderStore = defineStore('order', () => {
     const updated = response.data?.data || response.data
     const index = orders.value.findIndex(o => o.id === orderId)
     if (index !== -1) orders.value[index] = updated
+    await syncOrderFirestore(updated)
     return updated
+  }
+
+  function subscribeToOrders(filters = {}, options = {}) {
+    const path = filters.tableId || filters.table_id
+      ? `tableOrders/${filters.tableId || filters.table_id}`
+      : 'orders'
+
+    return subscribeFirestoreList(path, (firestoreOrders) => {
+      orders.value = firestoreOrders
+    }, options)
   }
 
   return {
@@ -96,5 +115,6 @@ export const useOrderStore = defineStore('order', () => {
     updateOrderStatus,
     getOrderDetails,
     requestPayment,
+    subscribeToOrders,
   }
 })

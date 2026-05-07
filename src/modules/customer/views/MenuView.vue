@@ -1,26 +1,26 @@
 <template>
   <main class="customer-menu">
     <section class="hero">
-      <button class="logout-button" @click="logout">Logout</button>
+      <button class="logout-button" @click="logout">{{ t('customer.logout') }}</button>
       <div>
-        <p class="eyebrow">Restaurant E-Menu</p>
-        <h1>Eat in now or reserve ahead, then order whenever you are ready.</h1>
+        <p class="eyebrow">{{ t('customer.restaurantMenu') }}</p>
+        <h1>{{ t('customer.heroTitle') }}</h1>
       </div>
       <div class="table-picker">
         <div class="mode-switch">
-          <button :class="{ active: visitMode === 'dine_in' }" @click="visitMode = 'dine_in'">Eat now</button>
-          <button :class="{ active: visitMode === 'reservation' }" @click="visitMode = 'reservation'">Reserve</button>
+          <button :class="{ active: visitMode === 'dine_in' }" @click="visitMode = 'dine_in'">{{ t('customer.eatNow') }}</button>
+          <button :class="{ active: visitMode === 'reservation' }" @click="visitMode = 'reservation'">{{ t('customer.reserve') }}</button>
         </div>
-        <label>Table</label>
+        <label>{{ t('customer.table') }}</label>
         <select v-model="selectedTableId" @change="selectTable">
-          <option value="">Select table</option>
+          <option value="">{{ t('customer.selectTable') }}</option>
           <option
             v-for="table in tables"
             :key="table.id"
             :value="table.id"
             :disabled="visitMode === 'reservation' && table.status !== 'empty'"
           >
-            Table {{ table.table_number || table.id }} - {{ table.capacity || 4 }} seats{{ table.status !== 'empty' ? ' - busy' : '' }}
+            {{ tableOptionLabel(table) }}
           </option>
         </select>
       </div>
@@ -28,22 +28,22 @@
 
     <section class="customer-shell">
       <aside class="reservation-panel">
-        <h2>{{ visitMode === 'dine_in' ? 'Dining at restaurant' : 'Reserve a table' }}</h2>
+        <h2>{{ visitMode === 'dine_in' ? t('customer.diningAtRestaurant') : t('customer.reserveTable') }}</h2>
         <p class="panel-copy">
-          {{ visitMode === 'dine_in' ? 'Select your table above, add dishes, then send the order to the kitchen.' : 'Book before arriving. Your table request will be saved for staff confirmation.' }}
+          {{ visitMode === 'dine_in' ? t('customer.dineInCopy') : t('customer.reserveCopy') }}
         </p>
         <form v-if="visitMode === 'reservation'" @submit.prevent="reserveTable">
-          <input v-model="reservation.customer_name" required placeholder="Your name" />
-          <input v-model="reservation.customer_phone" required placeholder="Phone" />
-          <input v-model="reservation.customer_email" type="email" placeholder="Email" />
+          <input v-model="reservation.customer_name" required :placeholder="t('customer.yourName')" />
+          <input v-model="reservation.customer_phone" required :placeholder="t('customer.phone')" />
+          <input v-model="reservation.customer_email" type="email" :placeholder="t('customer.email')" />
           <input v-model="reservation.reservation_time" required type="datetime-local" />
-          <input v-model.number="reservation.number_of_guests" required type="number" min="1" placeholder="Guests" />
-          <textarea v-model="reservation.special_requests" placeholder="Special requests"></textarea>
-          <button :disabled="reservationSaving">{{ reservationSaving ? 'Saving...' : 'Book table' }}</button>
+          <input v-model.number="reservation.number_of_guests" required type="number" min="1" :placeholder="t('customer.guests')" />
+          <textarea v-model="reservation.special_requests" :placeholder="t('customer.specialRequests')"></textarea>
+          <button :disabled="reservationSaving">{{ reservationSaving ? t('customer.saving') : t('customer.bookTable') }}</button>
         </form>
         <div v-else class="walk-in-card">
-          <strong>{{ selectedTableId ? `Table ${selectedTableId}` : 'No table selected' }}</strong>
-          <span>{{ selectedTableId ? 'Ready for ordering.' : 'Choose a table from the selector.' }}</span>
+          <strong>{{ selectedTableId ? `${t('customer.table')} ${selectedTableId}` : t('customer.noTableSelected') }}</strong>
+          <span>{{ selectedTableId ? t('customer.readyForOrdering') : t('customer.chooseTable') }}</span>
         </div>
         <p v-if="reservationMessage" class="message">{{ reservationMessage }}</p>
       </aside>
@@ -61,18 +61,18 @@
         </div>
 
         <p v-if="error" class="state error">{{ error }}</p>
-        <p v-else-if="loading" class="state">Loading menu...</p>
+        <p v-else-if="loading" class="state">{{ t('customer.loadingMenu') }}</p>
         <div v-else class="foods-grid">
           <article v-for="food in foods" :key="food.id" class="food-card">
-            <img :src="food.image_url || fallbackImage(food)" :alt="food.name || food.food_name" />
+            <img :src="dishImageUrl(food)" :alt="food.name || food.food_name" />
             <div class="food-info">
               <div>
                 <h3>{{ food.name || food.food_name }}</h3>
-                <p>{{ food.description || 'Freshly prepared by the kitchen.' }}</p>
+                <p>{{ food.description || t('customer.freshPrepared') }}</p>
               </div>
               <div class="food-footer">
                 <strong>{{ formatPrice(food.price) }}</strong>
-                <button @click="addToCart(food)">Add</button>
+                <button @click="addToCart(food)">{{ t('customer.add') }}</button>
               </div>
             </div>
           </article>
@@ -82,22 +82,24 @@
 
     <div class="floating-cart">
       <div>
-        <strong>{{ cartStore.itemCount }} items</strong>
+        <strong>{{ t('customer.itemCount', { count: cartStore.itemCount }) }}</strong>
         <span>{{ formatPrice(cartStore.totalPrice) }}</span>
       </div>
-      <router-link :to="cartPath">View cart</router-link>
+      <router-link :to="cartPath">{{ t('customer.viewCart') }}</router-link>
     </div>
   </main>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import api from '@/api'
 import { useMenuStore } from '@/stores/useMenuStore'
 import { useCartStore } from '@/stores/useCartStore'
 import { useTableStore } from '@/stores/useTableStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useRoute, useRouter } from 'vue-router'
+import { resolveAssetUrl } from '@/utils/assetUrl'
+import { currentLanguage, t } from '@/languages'
 
 const menuStore = useMenuStore()
 const cartStore = useCartStore()
@@ -108,7 +110,7 @@ const route = useRoute()
 
 const categories = ref([])
 const foods = ref([])
-const tables = ref([])
+const tables = computed(() => tableStore.tables)
 const selectedCategory = ref(null)
 const selectedTableId = ref(route.params.tableId || cartStore.tableId || '')
 const visitMode = ref('dine_in')
@@ -116,6 +118,7 @@ const loading = ref(false)
 const error = ref('')
 const reservationSaving = ref(false)
 const reservationMessage = ref('')
+let unsubscribeTables
 
 const reservation = reactive({
   table_id: '',
@@ -134,16 +137,20 @@ onMounted(async () => {
   try {
     if (selectedTableId.value) cartStore.setTable(selectedTableId.value)
     await Promise.all([menuStore.fetchCategories(), tableStore.fetchTables()])
+    unsubscribeTables = tableStore.subscribeToTables()
     categories.value = menuStore.categories
-    tables.value = tableStore.tables
     if (categories.value.length > 0) {
       await selectCategory(categories.value[0])
     }
   } catch (err) {
-    error.value = 'Failed to load menu.'
+    error.value = t('customer.failedMenu')
   } finally {
     loading.value = false
   }
+})
+
+onUnmounted(() => {
+  unsubscribeTables?.()
 })
 
 async function selectCategory(category) {
@@ -154,7 +161,7 @@ async function selectCategory(category) {
     foods.value = menuStore.foods
     selectedCategory.value = category
   } catch (err) {
-    error.value = 'Failed to load dishes.'
+    error.value = t('customer.failedDishes')
   } finally {
     loading.value = false
   }
@@ -162,7 +169,7 @@ async function selectCategory(category) {
 
 function addToCart(food) {
   if (!selectedTableId.value) {
-    error.value = 'Please select a table before adding dishes.'
+    error.value = t('customer.selectTableFirst')
     return
   }
   cartStore.setTable(selectedTableId.value)
@@ -184,12 +191,12 @@ async function logout() {
 async function reserveTable() {
   const tableId = reservation.table_id || selectedTableId.value
   if (!tableId) {
-    reservationMessage.value = 'Please select a table first.'
+    reservationMessage.value = t('customer.selectTableFirstReserve')
     return
   }
   const table = tables.value.find((item) => Number(item.id) === Number(tableId))
   if (table?.status !== 'empty') {
-    reservationMessage.value = 'Only empty tables can be reserved.'
+    reservationMessage.value = t('customer.onlyEmptyReserved')
     return
   }
   reservationSaving.value = true
@@ -202,7 +209,7 @@ async function reserveTable() {
       reservation_time: reservationTime,
       pre_order_items: cartStore.items,
     })
-    reservationMessage.value = 'Reservation request saved.'
+    reservationMessage.value = t('customer.reservationSaved')
     Object.assign(reservation, {
       table_id: '',
       customer_name: '',
@@ -213,7 +220,7 @@ async function reserveTable() {
       special_requests: '',
     })
   } catch (err) {
-    reservationMessage.value = err.response?.data?.message || 'Reservation failed.'
+    reservationMessage.value = err.response?.data?.message || t('customer.reservationFailed')
   } finally {
     reservationSaving.value = false
   }
@@ -224,8 +231,21 @@ function fallbackImage(food) {
   return `https://placehold.co/640x420/f3f4f6/344054?text=${label}`
 }
 
+function dishImageUrl(food) {
+  return food.image_url ? resolveAssetUrl(food.image_url) : fallbackImage(food)
+}
+
+function tableOptionLabel(table) {
+  const label = t('customer.tableOption', {
+    table: table.table_number || table.id,
+    capacity: table.capacity || 4,
+  })
+  return table.status !== 'empty' ? `${label} - ${t('customer.tableBusy')}` : label
+}
+
 function formatPrice(price) {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(price || 0))
+  const locale = currentLanguage.value === 'en' ? 'en-US' : 'vi-VN'
+  return new Intl.NumberFormat(locale, { style: 'currency', currency: 'VND' }).format(Number(price || 0))
 }
 </script>
 

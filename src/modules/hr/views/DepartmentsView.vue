@@ -1,11 +1,11 @@
 <template>
   <MasterLayout show-footer>
     <div class="departments-view">
-      <MasterPageHeader title="Phòng ban" />
+      <MasterPageHeader :title="t('hr.departments')" />
       <div class="departments-list">
         <div v-for="department in departments" :key="department.id" class="department-card">
           <h3>{{ department.name }}</h3>
-          <p>Employees: {{ department.employees?.length || 0 }}</p>
+          <p>{{ t('hr.departmentEmployees') }}: {{ department.employees?.length || 0 }}</p>
         </div>
       </div>
     </div>
@@ -13,10 +13,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import api from '@/api'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
+import { t } from '@/languages'
 
 const departments = ref([])
 
@@ -25,7 +26,7 @@ onMounted(async () => {
     const response = await api.get('/departments')
     departments.value = response.data
   } catch (err) {
-    console.error('Failed to fetch departments:', err)
+    console.error(t('hr.failedDepartments'), err)
   }
 })
 </script>

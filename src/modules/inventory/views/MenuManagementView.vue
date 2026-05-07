@@ -1,66 +1,66 @@
 <template>
   <MasterLayout show-footer>
     <main class="ops-page">
-      <MasterPageHeader title="Thực đơn">
+      <MasterPageHeader :title="t('menu.title')">
         <template #actions>
           <button class="primary-action" @click="saveFood" :disabled="saving">
-            {{ saving ? 'Đang lưu...' : editingId ? 'Cập nhật món' : 'Thêm món' }}
+            {{ saving ? t('menu.saving') : editingId ? t('menu.updateDish') : t('menu.addDish') }}
           </button>
         </template>
       </MasterPageHeader>
 
       <section class="toolbar">
-        <input v-model="search" type="search" placeholder="Search dishes" />
+        <input v-model="search" type="search" :placeholder="t('menu.searchDishes')" />
         <select v-model="categoryFilter">
-          <option value="">All categories</option>
+          <option value="">{{ t('menu.allCategories') }}</option>
           <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
         </select>
-        <button class="ghost-action" @click="resetForm">Clear form</button>
+        <button class="ghost-action" @click="resetForm">{{ t('menu.clearForm') }}</button>
       </section>
 
       <form class="inline-form" @submit.prevent="saveFood">
-        <input v-model="form.name" required placeholder="Dish name" />
+        <input v-model="form.name" required :placeholder="t('menu.dishName')" />
         <select v-model="form.category_id" required>
-          <option value="" disabled>Category</option>
+          <option value="" disabled>{{ t('menu.category') }}</option>
           <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
         </select>
-        <input v-model.number="form.price" required type="number" step="1000" placeholder="Price" />
-        <input v-model.number="form.preparation_time" type="number" placeholder="Minutes" />
-        <input v-model="form.image_url" placeholder="Image URL" />
-        <input type="file" accept="image/*" @change="handleImageFile" />
-        <label class="checkbox"><input v-model="form.is_available" type="checkbox" /> Available</label>
-        <label class="checkbox"><input v-model="form.is_popular" type="checkbox" /> Popular</label>
-        <textarea v-model="form.description" placeholder="Description"></textarea>
+        <input v-model.number="form.price" required type="number" step="1000" :placeholder="t('menu.price')" />
+        <input v-model.number="form.preparation_time" type="number" :placeholder="t('menu.minutes')" />
+        <input v-model="form.image_url" :placeholder="t('menu.imageUrl')" />
+        <input ref="fileInput" type="file" accept="image/*" @change="handleImageFile" />
+        <label class="checkbox"><input v-model="form.is_available" type="checkbox" /> {{ t('menu.available') }}</label>
+        <label class="checkbox"><input v-model="form.is_popular" type="checkbox" /> {{ t('menu.popular') }}</label>
+        <textarea v-model="form.description" :placeholder="t('menu.description')"></textarea>
       </form>
 
       <div v-if="form.image_url" class="image-preview">
-        <img :src="form.image_url" alt="Dish preview" />
-        <button class="ghost-action" @click="form.image_url = ''">Remove image</button>
+        <img :src="dishImageUrl({ image_url: form.image_url, name: form.name })" alt="Dish preview" />
+        <button class="ghost-action" @click="removeImage">{{ t('menu.removeImage') }}</button>
       </div>
 
       <p v-if="error" class="state error">{{ error }}</p>
-      <p v-else-if="loading" class="state">Loading menu...</p>
-      <p v-else-if="filteredFoods.length === 0" class="state">No dishes found.</p>
+      <p v-else-if="loading" class="state">{{ t('menu.loading') }}</p>
+      <p v-else-if="filteredFoods.length === 0" class="state">{{ t('menu.noDishes') }}</p>
 
       <div v-else class="menu-grid">
         <article v-for="food in filteredFoods" :key="food.id" class="dish">
           <div>
-            <img class="dish-image" :src="food.image_url || fallbackImage(food)" :alt="food.name || food.food_name" />
+            <img class="dish-image" :src="dishImageUrl(food)" :alt="food.name || food.food_name" />
             <div class="dish-title">
               <h2>{{ food.name || food.food_name }}</h2>
               <span class="badge" :class="{ muted: !food.is_available }">
-                {{ food.is_available ? 'Available' : 'Hidden' }}
+                {{ food.is_available ? t('menu.available') : t('menu.hidden') }}
               </span>
             </div>
-            <p>{{ food.description || 'No description' }}</p>
+            <p>{{ food.description || t('menu.noDescription') }}</p>
           </div>
           <div class="dish-meta">
             <span>{{ food.category?.name || categoryName(food.category_id) }}</span>
             <strong>{{ formatCurrency(food.price) }}</strong>
           </div>
           <div class="dish-actions">
-            <button @click="editFood(food)">Edit</button>
-            <button class="danger" @click="deleteFood(food)" :disabled="saving">Delete</button>
+            <button @click="editFood(food)">{{ t('menu.edit') }}</button>
+            <button class="danger" @click="deleteFood(food)" :disabled="saving">{{ t('menu.delete') }}</button>
           </div>
         </article>
       </div>
@@ -74,6 +74,8 @@ import { isAbortError } from '@/api/requestManager'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { menuService } from '@/services'
+import { resolveAssetUrl } from '@/utils/assetUrl'
+import { currentLanguage, t } from '@/languages'
 
 const foods = ref([])
 const categories = ref([])
@@ -83,6 +85,8 @@ const error = ref('')
 const search = ref('')
 const categoryFilter = ref('')
 const editingId = ref(null)
+const fileInput = ref(null)
+const selectedImageFile = ref(null)
 
 const blankForm = {
   name: '',
@@ -120,7 +124,7 @@ async function loadData() {
     categories.value = categoryList
   } catch (err) {
     if (isAbortError(err)) return
-    error.value = err.message || 'Failed to load menu.'
+    error.value = err.message || t('menu.failedLoad')
   } finally {
     loading.value = false
   }
@@ -131,15 +135,16 @@ async function saveFood() {
   saving.value = true
   error.value = ''
   try {
+    const { data, config } = buildFoodPayload()
     if (editingId.value) {
-      await menuService.updateFood(editingId.value, { ...form })
+      await menuService.updateFood(editingId.value, data, config)
     } else {
-      await menuService.createFood({ ...form })
+      await menuService.createFood(data, config)
     }
     resetForm()
     await loadData()
   } catch (err) {
-    error.value = err.message || 'Failed to save dish.'
+    error.value = err.message || t('menu.failedSave')
   } finally {
     saving.value = false
   }
@@ -167,7 +172,7 @@ async function deleteFood(food) {
     if (editingId.value === food.id) resetForm()
     await loadData()
   } catch (err) {
-    error.value = err.message || 'Failed to delete dish.'
+    error.value = err.message || t('menu.failedDelete')
   } finally {
     saving.value = false
   }
@@ -175,30 +180,85 @@ async function deleteFood(food) {
 
 function resetForm() {
   editingId.value = null
+  selectedImageFile.value = null
   Object.assign(form, { ...blankForm })
+  if (fileInput.value) fileInput.value.value = ''
+}
+
+function buildFoodPayload() {
+  if (!selectedImageFile.value) {
+    return {
+      data: { ...form },
+      config: {},
+    }
+  }
+
+  const data = new FormData()
+  data.append('name', form.name)
+  data.append('category_id', form.category_id)
+  data.append('price', form.price)
+  data.append('is_available', form.is_available ? '1' : '0')
+  data.append('is_popular', form.is_popular ? '1' : '0')
+  data.append('image_file', selectedImageFile.value)
+
+  if (form.description) data.append('description', form.description)
+  if (form.preparation_time) data.append('preparation_time', form.preparation_time)
+
+  return {
+    data,
+    config: { headers: { 'Content-Type': 'multipart/form-data' } },
+  }
 }
 
 function categoryName(id) {
-  return categories.value.find((category) => Number(category.id) === Number(id))?.name || 'Uncategorized'
+  return categories.value.find((category) => Number(category.id) === Number(id))?.name || t('menu.uncategorized')
 }
 
 function formatCurrency(value) {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value || 0))
+  return new Intl.NumberFormat(currentLanguage.value === 'vi' ? 'vi-VN' : 'en-US', {
+    style: 'currency',
+    currency: 'VND',
+  }).format(Number(value || 0))
 }
 
-function handleImageFile(event) {
+async function handleImageFile(event) {
   const file = event.target.files?.[0]
   if (!file) return
-  const reader = new FileReader()
-  reader.onload = () => {
-    form.image_url = reader.result
+
+  error.value = ''
+
+  if (!file.type.startsWith('image/')) {
+    error.value = t('menu.chooseImage')
+    if (fileInput.value) fileInput.value.value = ''
+    return
   }
-  reader.readAsDataURL(file)
+
+  if (file.size > 2 * 1024 * 1024) {
+    error.value = t('menu.imageTooLarge')
+    if (fileInput.value) fileInput.value.value = ''
+    return
+  }
+
+  selectedImageFile.value = file
+  form.image_url = URL.createObjectURL(file)
+}
+
+function removeImage() {
+  if (form.image_url?.startsWith('blob:')) {
+    URL.revokeObjectURL(form.image_url)
+  }
+  selectedImageFile.value = null
+  form.image_url = ''
+  if (fileInput.value) fileInput.value.value = ''
 }
 
 function fallbackImage(food) {
   const label = encodeURIComponent(food.name || food.food_name || 'Dish')
   return `https://placehold.co/640x420/f3f4f6/344054?text=${label}`
+}
+
+function dishImageUrl(food) {
+  return food.image_url ? resolveAssetUrl(food.image_url) : fallbackImage(food)
 }
 </script>
 

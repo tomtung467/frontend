@@ -1,7 +1,7 @@
 <template>
   <MasterLayout show-footer>
     <main class="ops-page">
-      <MasterPageHeader title="Báo cáo">
+      <MasterPageHeader :title="t('analytics.reports')">
         <template #actions>
           <button class="primary-action" @click="generateReport" :disabled="loading">
             {{ loading ? 'Đang tạo...' : 'Tạo báo cáo' }}
@@ -86,6 +86,7 @@ import { onMounted, reactive, ref } from 'vue'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { analyticsService } from '@/services'
+import { t } from '@/languages'
 
 const today = new Date().toISOString().slice(0, 10)
 const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)

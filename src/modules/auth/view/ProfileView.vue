@@ -13,11 +13,12 @@
             <!-- Avatar Section -->
             <div class="text-center mb-6">
               <v-avatar size="120" class="mb-4">
-                <v-img :src="userAvatar" :alt="user?.name">
-                  <template v-slot:error>
-                    <v-icon size="120">mdi-account-circle</v-icon>
+                <v-img v-if="userAvatar" :src="userAvatar" :alt="user?.name">
+                  <template #error>
+                    <span class="profile-avatar-fallback">{{ userInitials }}</span>
                   </template>
                 </v-img>
+                <span v-else class="profile-avatar-fallback">{{ userInitials }}</span>
               </v-avatar>
               <div>
                 <v-btn variant="outlined" color="primary" size="small">
@@ -176,7 +177,16 @@ const form = ref({
 });
 
 const user = computed(() => authStore.user || {});
-const userAvatar = computed(() => user.value?.avatar || 'https://via.placeholder.com/120?text=Avatar');
+const userAvatar = computed(() => user.value?.avatar || '');
+const userInitials = computed(() => {
+  const source = user.value?.name || user.value?.email || 'U';
+  return source
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'U';
+});
 
 const nameRules = [
   (v) => !!v || 'Tên không được để trống',
@@ -238,4 +248,14 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.profile-avatar-fallback {
+  display: inline-grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: #1e6abc;
+  color: white;
+  font-size: 38px;
+  font-weight: 800;
+}
 </style>

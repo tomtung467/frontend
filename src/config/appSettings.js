@@ -4,6 +4,7 @@ const STORAGE_KEY = 'restaurant_app_settings'
 
 const defaults = {
   navLayout: 'top',
+  language: 'vi',
 }
 
 function readSettings() {
