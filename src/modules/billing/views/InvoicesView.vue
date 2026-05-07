@@ -11,7 +11,7 @@
         <article v-for="bill in currentBills" :key="bill.id" class="bill-card" :class="{ alert: bill.payment_requested_at }">
           <div>
             <strong>{{ t('billing.table') }} {{ bill.table?.table_number || bill.table_id }}</strong>
-            <span>{{ bill.order_number }} · {{ bill.status }}</span>
+            <span>{{ bill.order_number }} - {{ orderStatusLabel(bill.status) }}</span>
           </div>
           <div>
             <span>{{ t('billing.subtotal') }}</span>
@@ -33,8 +33,7 @@
         </select>
       </section>
 
-      <p v-if="error" class="state error">{{ error }}</p>
-      <p v-else-if="loading" class="state">{{ t('billing.loadingInvoices') }}</p>
+      <p v-if="loading" class="state">{{ t('billing.loadingInvoices') }}</p>
       <p v-else-if="filteredInvoices.length === 0" class="state">{{ t('billing.noInvoices') }}</p>
 
       <div v-else class="data-table">
@@ -58,13 +57,14 @@
               <td>{{ formatCurrency(invoice.subtotal) }}</td>
               <td>{{ formatCurrency(invoice.tax) }}</td>
               <td>{{ formatCurrency(invoice.discount) }}</td>
-              <td>{{ formatCurrency(invoice.total) }}</td>
-              <td><span class="badge">{{ invoice.status }}</span></td>
+              <td><strong>{{ formatCurrency(invoice.total) }}</strong></td>
+              <td><span class="badge" :class="invoice.status">{{ invoiceStatusLabel(invoice.status) }}</span></td>
               <td>{{ formatDate(invoice.issued_at) }}</td>
             </tr>
           </tbody>
         </table>
       </div>
+
     </main>
   </MasterLayout>
 </template>
@@ -73,6 +73,8 @@
 import { computed, onMounted, ref } from 'vue'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
+import { showNotification } from '@/composables/usePopup'
+import { isAbortError } from '@/api/requestManager'
 import { paymentService } from '@/services'
 import { currentLanguage, t } from '@/languages'
 
@@ -100,10 +102,30 @@ async function loadInvoices() {
     invoices.value = await paymentService.getInvoices()
     currentBills.value = await paymentService.getCurrentBills()
   } catch (err) {
-    error.value = err.message || t('billing.failedInvoices')
+    if (isAbortError(err)) return
+    showPopup('danger', t('common.error'), err.message || t('billing.failedInvoices'))
   } finally {
     loading.value = false
   }
+}
+
+function showPopup(type, title, message = '') {
+  showNotification({ type, title, message })
+}
+
+function invoiceStatusLabel(status) {
+  return {
+    draft: t('billing.draft'),
+    issued: t('billing.issued'),
+    paid: t('billing.paid'),
+    overdue: t('billing.overdue'),
+    cancelled: t('billing.cancelled'),
+  }[status] || status || '-'
+}
+
+function orderStatusLabel(status) {
+  const translated = t(`status.${status}`)
+  return translated === `status.${status}` ? (status || '-') : translated
 }
 
 function locale() {
@@ -135,11 +157,13 @@ input, select { min-height: 38px; border: 1px solid #d0d5dd; border-radius: 6px;
 button { border: 0; border-radius: 6px; min-height: 38px; padding: 0 14px; cursor: pointer; }
 .ghost-action { background: #f2f4f7; color: #344054; }
 .state { padding: 18px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; color: #475467; }
-.state.error { color: #b42318; border-color: #fecdca; background: #fffbfa; }
 .data-table { overflow-x: auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 13px 14px; border-bottom: 1px solid #eaecf0; text-align: left; }
 th { color: #667085; font-size: 12px; text-transform: uppercase; background: #f9fafb; }
 .badge { border-radius: 999px; padding: 4px 9px; font-size: 12px; background: #eff8ff; color: #175cd3; }
+.badge.paid { background: #ecfdf3; color: #027a48; }
+.badge.overdue, .badge.cancelled { background: #fef3f2; color: #b42318; }
+.badge.draft { background: #f2f4f7; color: #344054; }
 @media (max-width: 720px) { .ops-page { padding: 16px; } .toolbar input { min-width: 100%; } }
 </style>

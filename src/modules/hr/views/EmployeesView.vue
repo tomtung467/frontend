@@ -3,28 +3,19 @@
     <main class="ops-page">
       <MasterPageHeader :title="t('hr.employees')">
         <template #actions>
-          <button class="ghost-action" @click="loadEmployees">{{ t('hr.refresh') }}</button>
+          <div class="header-controls">
+            <input v-model="search" type="search" :placeholder="t('hr.search')" />
+            <select v-model="statusFilter">
+              <option value="">{{ t('hr.allStatuses') }}</option>
+              <option value="active">{{ t('hr.active') }}</option>
+              <option value="inactive">{{ t('hr.inactive') }}</option>
+              <option value="on_leave">{{ t('hr.onLeave') }}</option>
+              <option value="terminated">{{ t('hr.terminated') }}</option>
+            </select>
+          </div>
+          <button class="primary-action" @click="openCreateModal">{{ t('hr.addEmployee') }}</button>
         </template>
       </MasterPageHeader>
-
-      <form class="inline-form" @submit.prevent="createEmployee">
-        <input v-model="form.first_name" required :placeholder="t('hr.firstName')" />
-        <input v-model="form.last_name" required :placeholder="t('hr.lastName')" />
-        <input v-model="form.email" required type="email" :placeholder="t('hr.loginEmail')" />
-        <input v-model="form.position" required :placeholder="t('hr.position')" />
-        <select v-model="form.department_id">
-          <option value="">{{ t('hr.noDepartment') }}</option>
-          <option v-for="department in departments" :key="department.id" :value="department.id">{{ department.name }}</option>
-        </select>
-        <select v-model="form.role">
-          <option value="staff">{{ t('hr.staff') }}</option>
-          <option value="chef">{{ t('hr.chef') }}</option>
-          <option value="manager">{{ t('hr.manager') }}</option>
-        </select>
-        <input v-model.number="form.salary" required type="number" step="100000" :placeholder="t('hr.salary')" />
-        <input v-model="form.hire_date" required type="date" />
-        <button class="primary-action" :disabled="saving">{{ saving ? t('menu.saving') : t('hr.addEmployee') }}</button>
-      </form>
 
       <section class="summary-strip">
         <div class="metric"><span>{{ t('hr.total') }}</span><strong>{{ employees.length }}</strong></div>
@@ -32,19 +23,7 @@
         <div class="metric warning"><span>{{ t('hr.onLeave') }}</span><strong>{{ countByStatus('on_leave') }}</strong></div>
       </section>
 
-      <section class="toolbar">
-        <input v-model="search" type="search" :placeholder="t('hr.search')" />
-        <select v-model="statusFilter">
-          <option value="">{{ t('hr.allStatuses') }}</option>
-          <option value="active">{{ t('hr.active') }}</option>
-          <option value="inactive">{{ t('hr.inactive') }}</option>
-          <option value="on_leave">{{ t('hr.onLeave') }}</option>
-          <option value="terminated">{{ t('hr.terminated') }}</option>
-        </select>
-      </section>
-
-      <p v-if="error" class="state error">{{ error }}</p>
-      <p v-else-if="loading" class="state">{{ t('hr.loading') }}</p>
+      <p v-if="loading" class="state">{{ t('hr.loading') }}</p>
       <p v-else-if="filteredEmployees.length === 0" class="state">{{ t('hr.noEmployees') }}</p>
 
       <div v-else class="data-table">
@@ -57,6 +36,7 @@
               <th>{{ t('hr.hireDate') }}</th>
               <th>{{ t('hr.salary') }}</th>
               <th>{{ t('inventory.status') }}</th>
+              <th>{{ t('hr.actions') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -77,18 +57,106 @@
                   <option value="terminated">{{ t('hr.terminated') }}</option>
                 </select>
               </td>
+              <td>
+                <div class="row-actions">
+                  <button class="ghost-action compact" @click="openEditModal(employee)">{{ t('menu.edit') }}</button>
+                  <button class="danger-action compact" :disabled="saving" @click="askDeleteEmployee(employee)">{{ t('menu.delete') }}</button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
+
+      <Teleport to="body">
+        <transition name="drawer-fade">
+          <div v-if="formModalOpen" class="drawer-backdrop" @click.self="closeFormModal">
+            <aside class="entity-drawer" role="dialog" aria-modal="true">
+              <header class="drawer-header">
+                <div>
+                  <h2>{{ editingId ? t('hr.updateEmployee') : t('hr.addEmployee') }}</h2>
+                  <p>{{ editingId ? `${form.first_name} ${form.last_name}`.trim() : t('hr.position') }}</p>
+                </div>
+                <button class="icon-action" type="button" aria-label="Close" @click="closeFormModal">&times;</button>
+              </header>
+
+              <form class="drawer-form" @submit.prevent="saveEmployee">
+                <div class="form-row">
+                  <label>
+                    <span>{{ t('hr.firstName') }}</span>
+                    <input v-model="form.first_name" required :placeholder="t('hr.firstName')" />
+                  </label>
+                  <label>
+                    <span>{{ t('hr.lastName') }}</span>
+                    <input v-model="form.last_name" required :placeholder="t('hr.lastName')" />
+                  </label>
+                </div>
+                <label>
+                  <span>{{ t('hr.loginEmail') }}</span>
+                  <input v-model="form.email" required type="email" :placeholder="t('hr.loginEmail')" />
+                </label>
+                <label>
+                  <span>{{ t('hr.position') }}</span>
+                  <input v-model="form.position" required :placeholder="t('hr.position')" />
+                </label>
+                <div class="form-row">
+                  <label>
+                    <span>{{ t('hr.department') }}</span>
+                    <select v-model="form.department_id">
+                      <option value="">{{ t('hr.noDepartment') }}</option>
+                      <option v-for="department in departments" :key="department.id" :value="department.id">{{ department.name }}</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>{{ t('hr.role') }}</span>
+                    <select v-model="form.role">
+                      <option value="staff">{{ t('hr.staff') }}</option>
+                      <option value="chef">{{ t('hr.chef') }}</option>
+                      <option value="manager">{{ t('hr.manager') }}</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    <span>{{ t('hr.salary') }}</span>
+                    <input v-model.number="form.salary" required type="number" step="100000" :placeholder="t('hr.salary')" />
+                  </label>
+                  <label>
+                    <span>{{ t('hr.hireDate') }}</span>
+                    <input v-model="form.hire_date" required type="date" />
+                  </label>
+                </div>
+                <footer class="drawer-actions">
+                  <button type="button" class="ghost-action" @click="closeFormModal">{{ t('user.cancel') }}</button>
+                  <button class="primary-action" :disabled="saving">{{ saving ? t('menu.saving') : editingId ? t('hr.updateEmployee') : t('hr.addEmployee') }}</button>
+                </footer>
+              </form>
+            </aside>
+          </div>
+        </transition>
+      </Teleport>
+
+      <UiPopup
+        v-model="popup.open"
+        :type="popup.type"
+        :title="popup.title"
+        :message="popup.message"
+        :confirm-text="popup.confirmText"
+        :cancel-text="popup.cancelText"
+        @confirm="handlePopupConfirm"
+        @cancel="closePopup"
+      />
     </main>
   </MasterLayout>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
+import UiPopup from '@/components/common/UiPopup.vue'
+import { showNotification } from '@/composables/usePopup'
+import { isAbortError } from '@/api/requestManager'
 import { employeeService } from '@/services'
 import { currentLanguage, t } from '@/languages'
 
@@ -99,6 +167,18 @@ const saving = ref(false)
 const error = ref('')
 const search = ref('')
 const statusFilter = ref('')
+const editingId = ref(null)
+const formModalOpen = ref(false)
+const pendingDelete = ref(null)
+const popup = reactive({
+  open: false,
+  type: 'info',
+  title: '',
+  message: '',
+  confirmText: 'OK',
+  cancelText: '',
+  action: '',
+})
 const form = ref({
   first_name: '',
   last_name: '',
@@ -138,36 +218,33 @@ async function loadEmployees() {
     employees.value = employeeList
     departments.value = departmentList
   } catch (err) {
+    if (isAbortError(err)) return
     error.value = err.message || t('hr.failedLoad')
   } finally {
     loading.value = false
   }
 }
 
-async function createEmployee() {
+async function saveEmployee() {
   saving.value = true
   error.value = ''
   try {
-    await employeeService.createEmployee({
+    const payload = {
       ...form.value,
       name: `${form.value.first_name} ${form.value.last_name}`.trim(),
       department_id: form.value.department_id || null,
-      password: 'password123',
-    })
-    form.value = {
-      first_name: '',
-      last_name: '',
-      email: '',
-      position: '',
-      department_id: '',
-      role: 'staff',
-      salary: null,
-      hire_date: new Date().toISOString().slice(0, 10),
-      status: 'active',
     }
+    if (!editingId.value) payload.password = 'password123'
+    if (editingId.value) {
+      await employeeService.updateEmployee(editingId.value, payload)
+    } else {
+      await employeeService.createEmployee(payload)
+    }
+    closeFormModal()
     await loadEmployees()
   } catch (err) {
-    error.value = err.message || t('hr.failedCreate')
+    if (isAbortError(err)) return
+    showPopup('danger', t('common.error'), err.message || (editingId.value ? t('hr.failedUpdate') : t('hr.failedCreate')))
   } finally {
     saving.value = false
   }
@@ -181,10 +258,101 @@ async function updateStatus(employee, status) {
     await employeeService.updateEmployeeStatus(employee.id, status)
     employee.status = status
   } catch (err) {
-    error.value = err.message || t('hr.failedUpdate')
+    if (isAbortError(err)) return
+    showPopup('danger', t('common.error'), err.message || t('hr.failedUpdate'))
   } finally {
     saving.value = false
   }
+}
+
+function openCreateModal() {
+  resetForm()
+  formModalOpen.value = true
+}
+
+function openEditModal(employee) {
+  editEmployee(employee)
+  formModalOpen.value = true
+}
+
+function editEmployee(employee) {
+  editingId.value = employee.id
+  const nameParts = employeeName(employee).split(' ')
+  form.value = {
+    first_name: employee.first_name || nameParts.slice(0, -1).join(' ') || employeeName(employee),
+    last_name: employee.last_name || nameParts.slice(-1)[0] || '',
+    email: employee.user?.email || employee.email || '',
+    position: employee.position || '',
+    department_id: employee.department_id || employee.department?.id || '',
+    role: employee.user?.role || employee.role || 'staff',
+    salary: Number(employee.salary || 0),
+    hire_date: employee.hire_date || new Date().toISOString().slice(0, 10),
+    status: employee.status || 'active',
+  }
+}
+
+function closeFormModal() {
+  formModalOpen.value = false
+  resetForm()
+}
+
+function resetForm() {
+  editingId.value = null
+  form.value = {
+    first_name: '',
+    last_name: '',
+    email: '',
+    position: '',
+    department_id: '',
+    role: 'staff',
+    salary: null,
+    hire_date: new Date().toISOString().slice(0, 10),
+    status: 'active',
+  }
+}
+
+function askDeleteEmployee(employee) {
+  pendingDelete.value = employee
+  Object.assign(popup, {
+    open: true,
+    type: 'danger',
+    title: t('hr.deleteEmployeeTitle'),
+    message: `${t('hr.deleteEmployeeBody')} ${employeeName(employee)}?`,
+    confirmText: t('menu.delete'),
+    cancelText: t('user.cancel'),
+    action: 'delete',
+  })
+}
+
+async function deleteEmployee(employee) {
+  saving.value = true
+  try {
+    await employeeService.deleteEmployee(employee.id)
+    if (editingId.value === employee.id) resetForm()
+    await loadEmployees()
+  } catch (err) {
+    if (isAbortError(err)) return
+    showPopup('danger', t('common.error'), err.message || t('hr.failedDelete'))
+  } finally {
+    saving.value = false
+  }
+}
+
+function handlePopupConfirm() {
+  const action = popup.action
+  closePopup()
+  if (action === 'delete' && pendingDelete.value) {
+    deleteEmployee(pendingDelete.value)
+    pendingDelete.value = null
+  }
+}
+
+function showPopup(type, title, message = '') {
+  showNotification({ type, title, message })
+}
+
+function closePopup() {
+  popup.open = false
 }
 
 function employeeName(employee) {
@@ -210,28 +378,44 @@ function formatDate(value) {
 </script>
 
 <style scoped>
-.ops-page { padding: 24px; width: min(1320px, 100%); margin: 0 auto; }
-.toolbar, .summary-strip, .inline-form { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.ops-page { padding: 24px; width: min(1320px, 100%); margin: 0 auto; box-sizing: border-box; }
+.header-controls, .summary-strip { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .summary-strip { margin-bottom: 18px; }
-.metric { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px; min-width: 170px; }
+.metric { flex: 1 1 170px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px; min-width: 0; }
 .metric span { display: block; color: #667085; font-size: 13px; }
 .metric strong { font-size: 22px; color: #111827; }
 .metric.warning strong { color: #b42318; }
-.toolbar, .inline-form { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 14px; }
 input, select { min-height: 38px; border: 1px solid #d0d5dd; border-radius: 6px; padding: 0 10px; background: #fff; }
-.toolbar input { min-width: 280px; flex: 1; }
-.inline-form input, .inline-form select { flex: 1 1 150px; }
+.header-controls input { width: min(360px, 42vw); }
+.header-controls select { width: 170px; }
 button { border: 0; border-radius: 6px; min-height: 38px; padding: 0 14px; cursor: pointer; }
 .ghost-action { background: #f2f4f7; color: #344054; }
 .primary-action { background: #155eef; color: #fff; }
 .state { padding: 18px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; color: #475467; }
-.state.error { color: #b42318; border-color: #fecdca; background: #fffbfa; }
 .data-table { overflow-x: auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
-table { width: 100%; border-collapse: collapse; }
+table { width: 100%; min-width: 900px; border-collapse: collapse; }
 th, td { padding: 13px 14px; border-bottom: 1px solid #eaecf0; text-align: left; vertical-align: middle; }
 th { color: #667085; font-size: 12px; text-transform: uppercase; background: #f9fafb; }
 td strong, td small { display: block; }
 td small { color: #667085; margin-top: 3px; }
 .status-select { min-width: 130px; }
-@media (max-width: 720px) { .ops-page { padding: 16px; } .toolbar input { min-width: 100%; } }
+.row-actions { display: flex; gap: 8px; }
+.compact { min-height: 34px; padding: 0 10px; }
+.danger-action { background: #b42318; color: #fff; }
+.drawer-backdrop { position: fixed; inset: 0; z-index: 2900; display: flex; justify-content: flex-end; background: rgba(15, 23, 42, .34); }
+.entity-drawer { width: min(560px, 100%); height: 100%; overflow-y: auto; background: #fff; box-shadow: -18px 0 44px rgba(15, 23, 42, .18); }
+.drawer-header { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding: 22px 24px; border-bottom: 1px solid #eaecf0; background: #fff; }
+.drawer-header h2 { margin: 0; font-size: 24px; color: #111827; }
+.drawer-header p { margin: 6px 0 0; color: #667085; }
+.icon-action { display: grid; place-items: center; width: 38px; height: 38px; min-height: 38px; border-radius: 7px; padding: 0; background: #f2f4f7; color: #344054; font-size: 26px; line-height: 1; }
+.drawer-form { display: grid; gap: 16px; padding: 20px 24px 24px; }
+.drawer-form label { display: grid; gap: 7px; color: #344054; font-weight: 700; }
+.drawer-form input, .drawer-form select { width: 100%; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.drawer-actions { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 10px; padding-top: 16px; border-top: 1px solid #eaecf0; background: #fff; }
+.drawer-fade-enter-active, .drawer-fade-leave-active { transition: opacity .18s ease; }
+.drawer-fade-enter-active .entity-drawer, .drawer-fade-leave-active .entity-drawer { transition: transform .2s ease; }
+.drawer-fade-enter-from, .drawer-fade-leave-to { opacity: 0; }
+.drawer-fade-enter-from .entity-drawer, .drawer-fade-leave-to .entity-drawer { transform: translateX(28px); }
+@media (max-width: 720px) { .ops-page { padding: 16px; } .summary-strip { gap: 10px; } .header-controls, .header-controls input, .header-controls select { width: 100%; } .form-row { grid-template-columns: 1fr; } }
 </style>

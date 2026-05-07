@@ -131,6 +131,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { showPopup } from '@/composables/usePopup'
 
 const props = defineProps({
   isOpen: Boolean
@@ -181,7 +182,7 @@ const applyPromo = () => {
     discount.value = subtotal.value * 0.2
   } else {
     discount.value = 0
-    alert('Mã khuyến mãi không hợp lệ')
+    showPopup({ type: 'warning', title: 'Mã khuyến mãi', message: 'Mã khuyến mãi không hợp lệ' })
   }
 }
 

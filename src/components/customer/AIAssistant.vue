@@ -101,6 +101,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import { showPopup } from '@/composables/usePopup'
 
 const props = defineProps({
   isOpen: Boolean,
@@ -170,7 +171,7 @@ const sendMessage = () => {
     .slice(0, 5)
 
   if (results.value.length === 0) {
-    alert('Không tìm thấy món ăn phù hợp. Vui lòng thử từ khác.')
+    showPopup({ type: 'info', title: 'Tìm món', message: 'Không tìm thấy món ăn phù hợp. Vui lòng thử từ khác.' })
   }
 
   userInput.value = ''

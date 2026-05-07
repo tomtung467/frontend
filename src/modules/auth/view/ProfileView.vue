@@ -1,261 +1,238 @@
 <template>
-  <v-container>
-    <v-row>
-      <v-col cols="12">
-        <h1 class="text-h3 mb-6">Hồ sơ cá nhân</h1>
-      </v-col>
-    </v-row>
+  <MasterLayout show-footer>
+    <main class="profile-page">
+      <MasterPageHeader :title="t('user.profile')" />
 
-    <v-row>
-      <v-col cols="12" md="8">
-        <v-card class="pa-6">
-          <v-form @submit.prevent="updateProfile" ref="formRef">
-            <!-- Avatar Section -->
-            <div class="text-center mb-6">
-              <v-avatar size="120" class="mb-4">
-                <v-img v-if="userAvatar" :src="userAvatar" :alt="user?.name">
-                  <template #error>
-                    <span class="profile-avatar-fallback">{{ userInitials }}</span>
-                  </template>
-                </v-img>
-                <span v-else class="profile-avatar-fallback">{{ userInitials }}</span>
-              </v-avatar>
-              <div>
-                <v-btn variant="outlined" color="primary" size="small">
-                  Thay đổi ảnh
-                </v-btn>
-              </div>
+      <section class="profile-grid">
+        <form class="profile-panel" @submit.prevent="updateProfile">
+          <div class="profile-hero">
+            <div class="avatar">{{ userInitials }}</div>
+            <div>
+              <h2>{{ user.name || t('user.fallbackName') }}</h2>
+              <p>{{ user.email }}</p>
             </div>
+          </div>
 
-            <v-divider class="mb-6"></v-divider>
+          <div class="form-grid">
+            <label>
+              <span>{{ t('profile.fullName') }}</span>
+              <input v-model="form.name" required />
+            </label>
+            <label>
+              <span>Email</span>
+              <input v-model="form.email" disabled />
+            </label>
+            <label>
+              <span>{{ t('profile.phone') }}</span>
+              <input v-model="form.phone" />
+            </label>
+            <label>
+              <span>{{ t('profile.address') }}</span>
+              <input v-model="form.address" />
+            </label>
+            <label class="wide">
+              <span>{{ t('profile.bio') }}</span>
+              <textarea v-model="form.bio"></textarea>
+            </label>
+          </div>
 
-            <!-- Personal Information -->
-            <h3 class="text-h6 mb-4">Thông tin cá nhân</h3>
+          <div class="actions">
+            <button class="primary-action" :disabled="savingProfile">{{ savingProfile ? t('menu.saving') : t('profile.saveChanges') }}</button>
+            <button type="button" class="ghost-action" @click="initializeForm">{{ t('user.cancel') }}</button>
+          </div>
+        </form>
 
-            <v-row>
-              <v-col cols="12" sm="6">
-                <v-text-field
-                  v-model="form.name"
-                  label="Tên đầy đủ"
-                  variant="outlined"
-                  :rules="nameRules"
-                  required
-                ></v-text-field>
-              </v-col>
-              <v-col cols="12" sm="6">
-                <v-text-field
-                  v-model="form.email"
-                  label="Email"
-                  variant="outlined"
-                  type="email"
-                  :rules="emailRules"
-                  required
-                  disabled
-                ></v-text-field>
-              </v-col>
-            </v-row>
+        <aside class="side-panel">
+          <h2>{{ t('profile.account') }}</h2>
+          <dl>
+            <div><dt>{{ t('profile.role') }}</dt><dd>{{ user.role || '-' }}</dd></div>
+            <div><dt>{{ t('profile.joinedAt') }}</dt><dd>{{ formatDate(user.created_at) }}</dd></div>
+          </dl>
+          <button class="primary-action full" @click="showPasswordForm = !showPasswordForm">
+            {{ t('user.changePassword') }}
+          </button>
+          <button class="ghost-action full" @click="goToSettings">{{ t('user.settings') }}</button>
+        </aside>
+      </section>
 
-            <v-row>
-              <v-col cols="12" sm="6">
-                <v-text-field
-                  v-model="form.phone"
-                  label="Số điện thoại"
-                  variant="outlined"
-                ></v-text-field>
-              </v-col>
-              <v-col cols="12" sm="6">
-                <v-text-field
-                  v-model="form.address"
-                  label="Địa chỉ"
-                  variant="outlined"
-                ></v-text-field>
-              </v-col>
-            </v-row>
+      <section v-if="showPasswordForm" class="profile-panel password-panel">
+        <div class="panel-head">
+          <h2>{{ t('user.changePassword') }}</h2>
+          <button class="ghost-action" @click="resetPasswordForm">{{ t('user.cancel') }}</button>
+        </div>
+        <form class="form-grid" @submit.prevent="changePassword">
+          <label>
+            <span>{{ t('profile.currentPassword') }}</span>
+            <input v-model="passwordForm.current_password" type="password" required />
+          </label>
+          <label>
+            <span>{{ t('profile.newPassword') }}</span>
+            <input v-model="passwordForm.new_password" type="password" required minlength="8" />
+          </label>
+          <label>
+            <span>{{ t('profile.confirmPassword') }}</span>
+            <input v-model="passwordForm.password_confirmation" type="password" required minlength="8" />
+          </label>
+          <div class="password-strength wide">
+            <span>{{ t('profile.passwordStrength') }}</span>
+            <strong :style="{ color: passwordStrengthColor }">{{ passwordStrengthText }}</strong>
+            <i><b :style="{ width: passwordStrength + '%', background: passwordStrengthColor }"></b></i>
+          </div>
+          <div class="actions wide">
+            <button class="primary-action" :disabled="savingPassword">{{ savingPassword ? t('menu.saving') : t('profile.updatePassword') }}</button>
+          </div>
+        </form>
+      </section>
 
-            <v-row>
-              <v-col cols="12">
-                <v-text-field
-                  v-model="form.bio"
-                  label="Tiểu sử"
-                  variant="outlined"
-                  rows="4"
-                  multiline
-                ></v-text-field>
-              </v-col>
-            </v-row>
-
-            <v-divider class="my-6"></v-divider>
-
-            <!-- Account Information -->
-            <h3 class="text-h6 mb-4">Thông tin tài khoản</h3>
-
-            <v-row>
-              <v-col cols="12" sm="6">
-                <v-text-field
-                  v-model="user.role"
-                  label="Vai trò"
-                  variant="outlined"
-                  disabled
-                ></v-text-field>
-              </v-col>
-              <v-col cols="12" sm="6">
-                <v-text-field
-                  :model-value="user.created_at ? new Date(user.created_at).toLocaleDateString('vi-VN') : ''"
-                  label="Ngày tham gia"
-                  variant="outlined"
-                  disabled
-                ></v-text-field>
-              </v-col>
-            </v-row>
-
-            <!-- Buttons -->
-            <v-row class="mt-6">
-              <v-col cols="12" class="d-flex gap-2">
-                <v-btn
-                  type="submit"
-                  color="primary"
-                  size="large"
-                  :loading="isLoading"
-                >
-                  <v-icon start>mdi-content-save</v-icon>
-                  Lưu thay đổi
-                </v-btn>
-                <v-btn
-                  variant="outlined"
-                  size="large"
-                  @click="resetForm"
-                >
-                  Hủy
-                </v-btn>
-              </v-col>
-            </v-row>
-          </v-form>
-        </v-card>
-      </v-col>
-
-      <v-col cols="12" md="4">
-        <v-card class="pa-6">
-          <h3 class="text-h6 mb-4">Hành động nhanh</h3>
-          <v-list density="compact">
-            <v-list-item
-              prepend-icon="mdi-lock-reset"
-              link
-              @click="goToChangePassword"
-            >
-              <v-list-item-title>Đổi mật khẩu</v-list-item-title>
-            </v-list-item>
-            <v-list-item
-              prepend-icon="mdi-cog"
-              link
-              @click="goToSettings"
-            >
-              <v-list-item-title>Cài đặt</v-list-item-title>
-            </v-list-item>
-          </v-list>
-        </v-card>
-      </v-col>
-    </v-row>
-  </v-container>
+    </main>
+  </MasterLayout>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/stores/useAuthStore';
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import api from '@/api'
+import MasterLayout from '@/components/MasterLayout.vue'
+import MasterPageHeader from '@/components/MasterPageHeader.vue'
+import { showNotification } from '@/composables/usePopup'
+import { useAuthStore } from '@/stores/useAuthStore'
+import { currentLanguage, t } from '@/languages'
 
-const router = useRouter();
-const authStore = useAuthStore();
-const formRef = ref(null);
-const isLoading = ref(false);
+const router = useRouter()
+const authStore = useAuthStore()
+const savingProfile = ref(false)
+const savingPassword = ref(false)
+const showPasswordForm = ref(false)
+const form = reactive({ name: '', email: '', phone: '', address: '', bio: '' })
+const passwordForm = reactive({ current_password: '', new_password: '', password_confirmation: '' })
 
-const form = ref({
-  name: '',
-  email: '',
-  phone: '',
-  address: '',
-  bio: '',
-});
-
-const user = computed(() => authStore.user || {});
-const userAvatar = computed(() => user.value?.avatar || '');
+const user = computed(() => authStore.user || {})
 const userInitials = computed(() => {
-  const source = user.value?.name || user.value?.email || 'U';
-  return source
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('') || 'U';
-});
+  const source = user.value?.name || user.value?.email || 'U'
+  return source.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'U'
+})
 
-const nameRules = [
-  (v) => !!v || 'Tên không được để trống',
-  (v) => v?.length >= 2 || 'Tên phải có ít nhất 2 ký tự',
-];
+const passwordStrength = computed(() => {
+  const pwd = passwordForm.new_password
+  let score = 0
+  if (pwd.length >= 8) score += 30
+  if (pwd.length >= 12) score += 10
+  if (/[a-z]/.test(pwd)) score += 15
+  if (/[A-Z]/.test(pwd)) score += 15
+  if (/[0-9]/.test(pwd)) score += 15
+  if (/[^A-Za-z0-9]/.test(pwd)) score += 15
+  return Math.min(score, 100)
+})
 
-const emailRules = [
-  (v) => !!v || 'Email không được để trống',
-  (v) => /.+@.+\..+/.test(v) || 'Email không hợp lệ',
-];
+const passwordStrengthColor = computed(() => {
+  if (passwordStrength.value < 40) return '#d92d20'
+  if (passwordStrength.value < 75) return '#dc6803'
+  return '#039855'
+})
 
-const initializeForm = () => {
-  form.value = {
+const passwordStrengthText = computed(() => {
+  if (passwordStrength.value < 40) return t('profile.weak')
+  if (passwordStrength.value < 75) return t('profile.medium')
+  return t('profile.strong')
+})
+
+onMounted(() => {
+  initializeForm()
+  showPasswordForm.value = router.currentRoute.value.query.password === '1'
+})
+
+function initializeForm() {
+  Object.assign(form, {
     name: user.value?.name || '',
     email: user.value?.email || '',
     phone: user.value?.phone || '',
     address: user.value?.address || '',
     bio: user.value?.bio || '',
-  };
-};
+  })
+}
 
-const updateProfile = async () => {
-  const isValid = await formRef.value?.validate();
-  if (!isValid?.valid) return;
-
-  isLoading.value = true;
+async function updateProfile() {
+  savingProfile.value = true
   try {
-    // TODO: Make API call to update profile
-    console.log('Updating profile:', form.value);
-    // await api.put('/auth/profile', form.value);
-    authStore.$patch({
-      user: {
-        ...user.value,
-        ...form.value,
-      },
-    });
+    authStore.$patch({ user: { ...user.value, ...form } })
+    showPopup('success', t('profile.profileSaved'), t('profile.profileSavedBody'))
   } catch (err) {
-    console.error('Failed to update profile:', err);
+    showPopup('danger', t('common.error'), err.message || t('profile.profileFailed'))
   } finally {
-    isLoading.value = false;
+    savingProfile.value = false
   }
-};
+}
 
-const resetForm = () => {
-  initializeForm();
-};
+async function changePassword() {
+  if (passwordForm.new_password !== passwordForm.password_confirmation) {
+    showPopup('warning', t('common.error'), t('profile.passwordMismatch'))
+    return
+  }
+  savingPassword.value = true
+  try {
+    await api.post('/auth/change-password', {
+      current_password: passwordForm.current_password,
+      new_password: passwordForm.new_password,
+      new_password_confirmation: passwordForm.password_confirmation,
+    })
+    resetPasswordForm()
+    showPopup('success', t('profile.passwordUpdated'), t('profile.passwordUpdatedBody'))
+  } catch (err) {
+    showPopup('danger', t('common.error'), err.response?.data?.message || err.message || t('profile.passwordFailed'))
+  } finally {
+    savingPassword.value = false
+  }
+}
 
-const goToChangePassword = () => {
-  router.push({ name: 'ChangePassword' });
-};
+function resetPasswordForm() {
+  Object.assign(passwordForm, { current_password: '', new_password: '', password_confirmation: '' })
+  showPasswordForm.value = false
+}
 
-const goToSettings = () => {
-  router.push({ name: 'Settings' });
-};
+function showPopup(type, title, message = '') {
+  showNotification({ type, title, message })
+}
 
-onMounted(() => {
-  initializeForm();
-});
+function goToSettings() {
+  router.push({ name: 'Settings' })
+}
+
+function locale() {
+  return currentLanguage.value === 'en' ? 'en-US' : 'vi-VN'
+}
+
+function formatDate(value) {
+  return value ? new Intl.DateTimeFormat(locale()).format(new Date(value)) : '-'
+}
 </script>
 
 <style scoped>
-.profile-avatar-fallback {
-  display: inline-grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  background: #1e6abc;
-  color: white;
-  font-size: 38px;
-  font-weight: 800;
-}
+.profile-page { padding: 24px; width: min(1180px, 100%); margin: 0 auto; }
+.profile-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.profile-panel, .side-panel { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 18px; }
+.profile-hero { display: flex; align-items: center; gap: 16px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid #eaecf0; }
+.avatar { display: grid; place-items: center; width: 76px; height: 76px; border-radius: 999px; background: #1e6abc; color: #fff; font-size: 26px; font-weight: 900; }
+h2 { margin: 0; color: #101828; }
+p { margin: 5px 0 0; color: #667085; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+label { display: grid; gap: 6px; color: #344054; font-weight: 700; }
+input, textarea { width: 100%; min-height: 40px; border: 1px solid #d0d5dd; border-radius: 7px; padding: 0 11px; background: #fff; }
+input:disabled { background: #f9fafb; color: #667085; }
+textarea { min-height: 92px; padding-top: 10px; resize: vertical; }
+.wide { grid-column: 1 / -1; }
+.actions, .panel-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-top: 18px; }
+button { border: 0; border-radius: 7px; min-height: 40px; padding: 0 14px; cursor: pointer; font-weight: 800; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+.primary-action { background: #155eef; color: #fff; }
+.ghost-action { background: #f2f4f7; color: #344054; }
+.full { width: 100%; margin-top: 10px; }
+dl { display: grid; gap: 12px; margin: 16px 0; }
+dt { color: #667085; font-size: 13px; }
+dd { margin: 3px 0 0; color: #101828; font-weight: 800; }
+.password-panel { margin-top: 16px; }
+.password-strength { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; color: #475467; }
+.password-strength i { grid-column: 1 / -1; height: 8px; border-radius: 999px; background: #eef2f6; overflow: hidden; }
+.password-strength b { display: block; height: 100%; border-radius: inherit; }
+@media (max-width: 860px) { .profile-grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .profile-page { padding: 16px; } .form-grid { grid-template-columns: 1fr; } .wide { grid-column: auto; } }
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <div class="master-layout" :class="{ 'nav-vertical': appSettings.navLayout === 'side' }">
+  <div class="master-layout" :class="{ 'nav-vertical': isSideNavActive }">
     <!-- Top Navbar -->
     <MasterNavbar />
 
@@ -40,6 +40,8 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { useDisplay } from 'vuetify';
 import MasterNavbar from './MasterNavbar.vue';
 import { appSettings } from '@/config/appSettings';
 
@@ -50,42 +52,43 @@ interface Props {
 withDefaults(defineProps<Props>(), {
   showFooter: false
 });
+
+const { smAndDown } = useDisplay();
+const isSideNavActive = computed(() => appSettings.navLayout === 'side' && !smAndDown.value);
 </script>
 
 <style scoped>
 .master-layout {
+  --side-nav-width: 88px;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   background-color: #f5f5f5;
 }
 
+.master-layout.nav-vertical {
+  display: grid;
+  grid-template-columns: var(--side-nav-width) minmax(0, 1fr);
+  grid-template-rows: minmax(100vh, auto);
+}
+
 .layout-body {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .nav-vertical .layout-body {
-  padding-left: 88px;
+  grid-column: 2;
+  margin-left: 0;
+  width: 100%;
 }
 
 .nav-vertical :deep(.master-page-header) {
-  width: auto;
-  margin-left: -24px;
-  margin-right: -24px;
-}
-
-@media (max-width: 960px) {
-  .nav-vertical .layout-body {
-    padding-left: 0;
-  }
-
-  .nav-vertical :deep(.master-page-header) {
-    width: 100vw;
-    margin-left: calc(50% - 50vw);
-    margin-right: calc(50% - 50vw);
-  }
+  width: calc(100vw - var(--side-nav-width));
+  margin-left: calc((100% - (100vw - var(--side-nav-width))) / 2);
+  margin-right: calc((100% - (100vw - var(--side-nav-width))) / 2);
 }
 
 .layout-footer {

@@ -41,6 +41,7 @@
 
 <script setup>
 import { onMounted, onUnmounted } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { useKitchenStore } from '@/stores/useKitchenStore'
@@ -49,6 +50,7 @@ import { currentLanguage, t } from '@/languages'
 const kitchenStore = useKitchenStore()
 let refreshInterval
 let unsubscribeQueue
+let stopped = false
 
 onMounted(async () => {
   await kitchenStore.fetchQueue()
@@ -57,10 +59,20 @@ onMounted(async () => {
   })
 })
 
+onBeforeRouteLeave(() => {
+  stopRealtime()
+})
+
 onUnmounted(() => {
+  stopRealtime()
+})
+
+function stopRealtime() {
+  if (stopped) return
+  stopped = true
   clearInterval(refreshInterval)
   unsubscribeQueue?.()
-})
+}
 
 function startPolling() {
   if (refreshInterval) return

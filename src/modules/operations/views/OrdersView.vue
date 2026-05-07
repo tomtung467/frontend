@@ -46,7 +46,7 @@
               <h3>{{ t('customer.orderedItems') }}</h3>
               <ul v-if="orderItems(order).length">
                 <li v-for="item in orderItems(order)" :key="item.id || item.food_id">
-                  <span>{{ item.food?.name || item.food_name || item.name || `${t('menu.title')} #${item.food_id}` }}</span>
+                  <span>{{ itemName(item) }}</span>
                   <strong>x{{ item.quantity }}</strong>
                 </li>
               </ul>
@@ -106,6 +106,16 @@ async function loadOrders() {
 
 function orderItems(order) {
   return order.items || order.orderItems || order.order_items || []
+}
+
+function itemName(item) {
+  return item.food?.name ||
+    item.food?.food_name ||
+    item.food_name ||
+    item.name ||
+    item.menu_item?.name ||
+    item.menuItem?.name ||
+    `${t('menu.title')} #${item.food_id || item.id}`
 }
 
 function statusLabel(status) {

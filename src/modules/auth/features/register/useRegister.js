@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { validateRegister } from "../../functions/authValidator";
 import { registerService } from "./registerService";
+import { showPopup } from "@/composables/usePopup";
 
 export default function useRegister() {
   const router = useRouter();
@@ -33,7 +34,7 @@ export default function useRegister() {
         confirmPassword: confirmPassword.value.trim(),
       });
 
-      alert("Đăng ký thành công");
+      showPopup({ type: "success", title: "Đăng ký thành công", message: "Bạn có thể đăng nhập bằng tài khoản vừa tạo." });
       router.push("/login");
     } catch (err) {
       error.value = err?.response?.data?.message || "Đăng ký thất bại";

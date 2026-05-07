@@ -73,9 +73,10 @@
           <v-list-item-title>{{ t('user.settings') }}</v-list-item-title>
         </v-list-item>
 
-        <v-list-item prepend-icon="mdi-lock-reset" link @click="goToChangePassword">
-          <v-list-item-title>{{ t('user.changePassword') }}</v-list-item-title>
+        <v-list-item v-if="isAdmin" prepend-icon="mdi-account-key" link @click="goToPermissions">
+          <v-list-item-title>{{ t('user.permissions') }}</v-list-item-title>
         </v-list-item>
+
       </v-list>
 
       <v-divider />
@@ -124,6 +125,7 @@ interface User {
   name: string;
   email: string;
   avatar?: string;
+  role?: string;
 }
 
 interface Props {
@@ -144,6 +146,7 @@ const variant = computed(() => props.variant || 'chip');
 const userName = computed(() => props.user?.name || t('user.fallbackName'));
 const userEmail = computed(() => props.user?.email || '');
 const userAvatar = computed(() => props.user?.avatar || '');
+const isAdmin = computed(() => props.user?.role === 'admin');
 const selectedLanguage = computed({
   get: () => currentLanguage.value,
   set: (language: string) => setLanguage(language),
@@ -168,9 +171,9 @@ const goToSettings = () => {
   router.push({ name: 'Settings' }).catch(() => {});
 };
 
-const goToChangePassword = () => {
+const goToPermissions = () => {
   menu.value = false;
-  router.push({ name: 'ChangePassword' }).catch(() => {});
+  router.push({ name: 'Permissions' }).catch(() => {});
 };
 
 const handleLogout = () => {

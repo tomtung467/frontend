@@ -38,6 +38,7 @@ import { isAbortError } from '@/api/requestManager'
 import { useTableStore } from '@/stores/useTableStore'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
+import { showPopup } from '@/composables/usePopup'
 import { currentLanguage, t } from '@/languages'
 
 const tableStore = useTableStore()
@@ -61,7 +62,7 @@ async function updateStatus(tableId, status) {
   try {
     await tableStore.updateTableStatus(tableId, status)
   } catch (err) {
-    alert(t('tables.updateFailed'))
+    showPopup({ type: 'danger', title: t('common.error'), message: t('tables.updateFailed') })
   }
 }
 

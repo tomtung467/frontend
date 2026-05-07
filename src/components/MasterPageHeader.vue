@@ -34,6 +34,7 @@ const hasActions = computed(() => Boolean(slots.actions))
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
   min-height: 66px;
   width: 100vw;
@@ -45,6 +46,7 @@ const hasActions = computed(() => Boolean(slots.actions))
 }
 
 .title-block {
+  flex: 0 1 auto;
   min-width: 0;
 }
 
@@ -68,8 +70,59 @@ const hasActions = computed(() => Boolean(slots.actions))
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex: 1 1 520px;
+  min-width: 0;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.page-actions :deep(.header-controls) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1 1 420px;
+  min-width: 0;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.page-actions :deep(.header-controls input) {
+  flex: 1 1 260px;
+  width: auto;
+  min-width: 190px;
+  max-width: 100%;
+}
+
+.page-actions :deep(.header-controls select) {
+  flex: 0 1 220px;
+  width: auto;
+  min-width: 170px;
+  max-width: 100%;
+}
+
+.page-actions :deep(button) {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+@media (max-width: 1180px) {
+  .master-page-header {
+    align-items: flex-start;
+  }
+
+  .title-block,
+  .page-actions {
+    flex-basis: 100%;
+  }
+
+  .page-actions {
+    justify-content: flex-start;
+  }
+
+  .page-actions :deep(.header-controls) {
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 720px) {
@@ -86,6 +139,14 @@ const hasActions = computed(() => Boolean(slots.actions))
   .page-actions {
     justify-content: flex-start;
     width: 100%;
+  }
+
+  .page-actions :deep(.header-controls),
+  .page-actions :deep(.header-controls input),
+  .page-actions :deep(.header-controls select),
+  .page-actions :deep(button) {
+    width: 100%;
+    flex-basis: 100%;
   }
 }
 </style>

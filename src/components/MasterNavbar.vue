@@ -28,8 +28,20 @@
     <div class="navbar-wrapper">
       <v-toolbar-title class="navbar-brand" @click="goHome">
         <v-icon size="24">mdi-silverware-fork-knife</v-icon>
-        <span class="brand-name">RestaurantApp</span>
+        <span class="brand-name">{{ appSettings.siteName }}</span>
       </v-toolbar-title>
+
+      <v-btn
+        v-if="smAndDown"
+        icon
+        variant="text"
+        size="small"
+        class="mobile-menu-btn"
+        aria-label="Open navigation"
+        @click="mobileDrawer = true"
+      >
+        <v-icon size="25">mdi-menu</v-icon>
+      </v-btn>
 
       <div v-if="!smAndDown" class="navbar-menu">
         <v-tooltip v-for="item in visibleNavItems" :key="item.key" :text="navLabel(item)" location="bottom">
@@ -48,24 +60,6 @@
           </template>
         </v-tooltip>
       </div>
-
-      <v-menu v-else offset-y>
-        <template #activator="{ props }">
-          <v-btn v-bind="props" icon size="small" class="menu-icon-btn">
-            <v-icon size="24">mdi-menu</v-icon>
-          </v-btn>
-        </template>
-        <v-list density="compact" min-width="230">
-          <v-list-item
-            v-for="item in visibleNavItems"
-            :key="item.key"
-            :prepend-icon="item.icon"
-            @click="router.push(item.path)"
-          >
-            <v-list-item-title>{{ navLabel(item) }}</v-list-item-title>
-          </v-list-item>
-        </v-list>
-      </v-menu>
 
       <v-spacer />
 
@@ -95,6 +89,38 @@
       </div>
     </div>
   </v-app-bar>
+
+  <v-navigation-drawer
+    v-if="smAndDown"
+    v-model="mobileDrawer"
+    temporary
+    location="left"
+    width="304"
+    class="mobile-nav-drawer"
+  >
+    <div class="mobile-drawer-header">
+      <button class="drawer-brand" @click="goHomeAndClose">
+        <v-icon size="26">mdi-silverware-fork-knife</v-icon>
+        <span>{{ appSettings.siteName }}</span>
+      </button>
+      <button class="drawer-close" aria-label="Close navigation" @click="mobileDrawer = false">
+        <v-icon size="22">mdi-close</v-icon>
+      </button>
+    </div>
+
+    <nav class="mobile-nav-list">
+      <button
+        v-for="item in visibleNavItems"
+        :key="item.key"
+        class="mobile-nav-item"
+        :class="{ active: route.path === item.path }"
+        @click="navigateTo(item.path)"
+      >
+        <v-icon size="24">{{ item.icon }}</v-icon>
+        <span>{{ navLabel(item) }}</span>
+      </button>
+    </nav>
+  </v-navigation-drawer>
 </template>
 
 <script setup>
@@ -114,6 +140,7 @@ const { smAndDown } = useDisplay()
 
 const searchQuery = ref('')
 const searchExpanded = ref(false)
+const mobileDrawer = ref(false)
 
 const visibleNavItems = computed(() => getVisibleNavItems(authStore.user?.role || 'customer'))
 
@@ -129,6 +156,16 @@ onMounted(async () => {
 
 function goHome() {
   router.push(authStore.getDefaultRoute())
+}
+
+function goHomeAndClose() {
+  mobileDrawer.value = false
+  goHome()
+}
+
+function navigateTo(path) {
+  mobileDrawer.value = false
+  router.push(path)
 }
 
 function handleSearch() {
@@ -212,6 +249,7 @@ async function handleLogout() {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex: 0 0 auto !important;
   max-width: 210px;
   cursor: pointer;
   color: white;
@@ -228,12 +266,14 @@ async function handleLogout() {
   gap: 4px;
 }
 .menu-icon-btn,
-.action-icon-btn {
+.action-icon-btn,
+.mobile-menu-btn {
   color: white !important;
 }
 .menu-icon-btn.active,
 .menu-icon-btn:hover,
-.action-icon-btn:hover {
+.action-icon-btn:hover,
+.mobile-menu-btn:hover {
   background-color: rgba(255, 255, 255, .18) !important;
 }
 .search-field {
@@ -249,11 +289,128 @@ async function handleLogout() {
   color: rgba(255, 255, 255, .72);
 }
 @media (max-width: 960px) {
+  .master-navbar {
+    min-width: 0;
+  }
+
+  .navbar-wrapper {
+    gap: 8px;
+    min-width: 0;
+    padding: 0 10px;
+  }
+
   .brand-name {
     display: none;
   }
+
+  .navbar-actions {
+    gap: 2px;
+    min-width: 0;
+  }
+
   .search-field {
     display: none;
   }
+}
+
+@media (max-width: 520px) {
+  .navbar-wrapper {
+    padding: 0 8px;
+  }
+
+  .navbar-actions :deep(.v-divider),
+  .navbar-actions .action-icon-btn {
+    display: none;
+  }
+
+  .navbar-actions :deep(.user-name-text) {
+    display: none;
+  }
+}
+
+.mobile-nav-drawer {
+  border-right: 1px solid #d0d5dd;
+}
+
+.mobile-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 14px;
+  background: #1e6abc;
+  color: white;
+}
+
+.drawer-brand,
+.drawer-close,
+.mobile-nav-item {
+  border: 0;
+  cursor: pointer;
+}
+
+.drawer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  color: white;
+  background: transparent;
+  font-weight: 800;
+  font-size: 17px;
+}
+
+.drawer-brand span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawer-close {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  color: white;
+  background: rgba(255, 255, 255, .14);
+}
+
+.mobile-nav-list {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.mobile-nav-item {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: transparent;
+  color: #344054;
+  text-align: left;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.mobile-nav-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-nav-item.active {
+  background: #eaf3ff;
+  color: #155eef;
+}
+
+.mobile-nav-item:hover {
+  background: #f2f4f7;
 }
 </style>

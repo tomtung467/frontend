@@ -182,9 +182,15 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/permissions",
+    name: "Permissions",
+    component: () => import("@/modules/auth/view/PermissionsView.vue"),
+    meta: { requiresAuth: true, role: "admin" },
+  },
+  {
     path: "/change-password",
     name: "ChangePassword",
-    component: () => import("@/modules/auth/view/ChangePasswordView.vue"),
+    redirect: { name: "Profile", query: { password: "1" } },
     meta: { requiresAuth: true },
   },
 

@@ -71,6 +71,7 @@ import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/useCartStore'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { showPopup } from '@/composables/usePopup'
 import { currentLanguage, t } from '@/languages'
 
 const router = useRouter()
@@ -108,10 +109,10 @@ function continueShopping() {
 async function checkout() {
   try {
     await cartStore.checkout('card')
-    alert(t('customer.orderSent'))
+    showPopup({ type: 'success', title: t('common.saved'), message: t('customer.orderSent') })
     router.push(tableId.value ? `/orders/table/${tableId.value}` : '/my-orders')
   } catch (err) {
-    alert(`${t('customer.checkoutFailed')}: ${err.message}`)
+    showPopup({ type: 'danger', title: t('customer.checkoutFailed'), message: err.message })
   }
 }
 

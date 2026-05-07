@@ -82,9 +82,51 @@ export const useKitchenStore = defineStore('kitchen', () => {
   }
 
   function subscribeToQueue(options = {}) {
-    return subscribeFirestoreList('kitchenQueue', (firestoreQueue) => {
-      queue.value = firestoreQueue
-    }, options)
+    const token = localStorage.getItem('token')
+    const streamUrl = `${api.defaults.baseURL}/kitchen/queue-stream?token=${encodeURIComponent(token || '')}`
+    let firestoreUnsubscribe
+    let eventSource
+    let fallbackStarted = false
+    let disposed = false
+
+    function startFallback(error) {
+      if (fallbackStarted) return
+      fallbackStarted = true
+      firestoreUnsubscribe = subscribeFirestoreList('kitchenQueue', (firestoreQueue) => {
+        queue.value = firestoreQueue
+      }, {
+        onUnavailable: options.onUnavailable,
+      })
+      options.onUnavailable?.(error)
+    }
+
+    if (typeof EventSource === 'undefined' || !token) {
+      startFallback()
+      return () => firestoreUnsubscribe?.()
+    }
+
+    eventSource = new EventSource(streamUrl)
+    eventSource.addEventListener('queue', (event) => {
+      if (disposed) return
+      try {
+        const nextQueue = JSON.parse(event.data)
+        queue.value = Array.isArray(nextQueue) ? nextQueue : []
+        error.value = null
+      } catch (parseError) {
+        console.warn('Failed to parse kitchen queue stream:', parseError)
+      }
+    })
+    eventSource.onerror = (streamError) => {
+      if (!disposed) {
+        console.info('Kitchen queue stream reconnecting...', streamError)
+      }
+    }
+
+    return () => {
+      disposed = true
+      eventSource?.close()
+      firestoreUnsubscribe?.()
+    }
   }
 
   return {

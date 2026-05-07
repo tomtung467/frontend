@@ -3,13 +3,13 @@
     <main class="kitchen-page">
       <MasterPageHeader :title="t('kitchen.board')">
         <template #actions>
+          <span v-if="kitchenStore.loading" class="header-spinner" aria-label="Đang làm mới"></span>
           <router-link class="ghost-action" to="/kitchen/queue">{{ t('kitchen.queueList') }}</router-link>
-          <button class="primary-action" @click="refreshQueue">{{ t('kitchen.refreshQueue') }}</button>
+          <button class="primary-action" :disabled="kitchenStore.loading" @click="refreshQueue">{{ t('kitchen.refreshQueue') }}</button>
         </template>
       </MasterPageHeader>
 
       <p v-if="kitchenStore.error" class="state error">{{ kitchenStore.error }}</p>
-      <p v-else-if="kitchenStore.loading" class="state">{{ t('kitchen.loadingQueue') }}</p>
 
       <section class="kanban-board">
         <article v-for="column in columns" :key="column.key" class="kanban-column" :class="column.key">
@@ -52,6 +52,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { useKitchenStore } from '@/stores/useKitchenStore'
@@ -62,6 +63,7 @@ const now = ref(Date.now())
 let refreshInterval
 let timerInterval
 let unsubscribeQueue
+let stopped = false
 
 const columns = computed(() => [
   { key: 'pending', label: t('kitchen.pending'), statuses: ['pending', 'confirmed'], next: { status: 'in_progress', label: t('kitchen.startCooking') } },
@@ -77,11 +79,21 @@ onMounted(async () => {
   timerInterval = setInterval(() => { now.value = Date.now() }, 1000)
 })
 
+onBeforeRouteLeave(() => {
+  stopRealtime()
+})
+
 onUnmounted(() => {
+  stopRealtime()
+})
+
+function stopRealtime() {
+  if (stopped) return
+  stopped = true
   clearInterval(refreshInterval)
   clearInterval(timerInterval)
   unsubscribeQueue?.()
-})
+}
 
 function startPolling() {
   if (refreshInterval) return
@@ -123,7 +135,16 @@ function getTimer(order) {
 .kitchen-page { min-height: calc(100vh - 48px); background: #f5f7fb; padding: 24px; }
 button, .ghost-action { border: 0; border-radius: 7px; min-height: 40px; padding: 0 14px; display: inline-flex; align-items: center; text-decoration: none; cursor: pointer; font-weight: 700; }
 .primary-action { background: #ff6333; color: #fff; }
+.primary-action:disabled { opacity: .78; cursor: wait; }
 .ghost-action { background: #fff; color: #344054; border: 1px solid #d0d5dd; }
+.header-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(17, 24, 39, .18);
+  border-top-color: #ff6333;
+  border-radius: 50%;
+  animation: spin .75s linear infinite;
+}
 .state { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
 .state.error { color: #b42318; background: #fffbfa; border-color: #fecdca; }
 .kanban-board { display: grid; grid-template-columns: repeat(3, minmax(280px, 1fr)); gap: 18px; min-height: calc(100vh - 170px); }
@@ -144,6 +165,9 @@ header span { background: #ff6333; color: #fff; border-radius: 999px; min-width:
 .notes { margin: 0 0 12px; color: #475467; font-size: 13px; }
 .ticket-action { width: 100%; justify-content: center; background: #16a34a; color: #fff; }
 .ticket-action.done { background: #155eef; }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 @media (max-width: 980px) {
   .kanban-board { grid-template-columns: 1fr; }
 }
