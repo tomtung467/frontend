@@ -61,10 +61,10 @@ import { t } from '@/languages'
 
 const kitchenStore = useKitchenStore()
 const now = ref(Date.now())
-let refreshInterval
 let timerInterval
 let unsubscribeQueue
 let stopped = false
+let fallbackFetched = false
 
 const columns = computed(() => [
   { key: 'pending', label: t('kitchen.pending'), next: { itemStatus: 'preparing', label: t('kitchen.startCooking') } },
@@ -110,7 +110,7 @@ const kitchenTickets = computed(() =>
 onMounted(async () => {
   await kitchenStore.fetchQueue()
   unsubscribeQueue = kitchenStore.subscribeToQueue({
-    onUnavailable: startPolling,
+    onUnavailable: refreshOnceAfterStreamIssue,
   })
   timerInterval = setInterval(() => { now.value = Date.now() }, 1000)
 })
@@ -126,14 +126,14 @@ onUnmounted(() => {
 function stopRealtime() {
   if (stopped) return
   stopped = true
-  clearInterval(refreshInterval)
   clearInterval(timerInterval)
   unsubscribeQueue?.()
 }
 
-function startPolling() {
-  if (refreshInterval) return
-  refreshInterval = setInterval(() => kitchenStore.fetchQueue(), 5000)
+async function refreshOnceAfterStreamIssue() {
+  if (fallbackFetched || stopped) return
+  fallbackFetched = true
+  await kitchenStore.fetchQueue()
 }
 
 function ticketsByColumn(column) {

@@ -2,11 +2,6 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '@/api'
 import { isAbortError } from '@/api/requestManager'
-import {
-  subscribeFirestoreList,
-  syncTableFirestore,
-  syncTablesFirestore,
-} from '@/services/firebaseFirestoreService'
 
 export const useTableStore = defineStore('table', () => {
   const tables = ref([])
@@ -14,13 +9,13 @@ export const useTableStore = defineStore('table', () => {
   const loading = ref(false)
   const error = ref(null)
 
-  async function fetchTables(filters = {}) {
+  async function fetchTables(filters = {}, options = {}) {
     loading.value = true
     error.value = null
     try {
       const response = await api.get('/tables', { params: filters })
       tables.value = response.data?.data || response.data
-      await syncTablesFirestore(Array.isArray(tables.value) ? tables.value : [])
+      if (options.syncFirestore !== false) await syncTables(Array.isArray(tables.value) ? tables.value : [])
     } catch (err) {
       if (isAbortError(err)) throw err
       error.value = 'Failed to fetch tables'
@@ -46,7 +41,7 @@ export const useTableStore = defineStore('table', () => {
       const response = await api.put(`/tables/${tableId}/status`, { status })
       const updated = response.data?.data || response.data
       patchLocalTable(tableId, updated)
-      await syncTableFirestore(updated)
+      await syncTable(updated)
       return updated
     } catch (err) {
       if (isAbortError(err)) throw err
@@ -60,7 +55,7 @@ export const useTableStore = defineStore('table', () => {
       const response = await api.post('/tables', data)
       const created = response.data?.data || response.data
       tables.value = [...tables.value, created]
-      await syncTableFirestore(created)
+      await syncTable(created)
       return created
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to create table'
@@ -73,7 +68,7 @@ export const useTableStore = defineStore('table', () => {
       const response = await api.put(`/tables/${tableId}`, data)
       const updated = response.data?.data || response.data
       const merged = patchLocalTable(tableId, updated)
-      await syncTableFirestore(merged || updated)
+      await syncTable(merged || updated)
       return updated
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to update table'
@@ -85,7 +80,7 @@ export const useTableStore = defineStore('table', () => {
     try {
       await api.delete(`/tables/${tableId}`)
       tables.value = tables.value.filter(t => t.id !== tableId)
-      await syncTablesFirestore(tables.value)
+      await syncTables(tables.value)
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to delete table'
       throw err
@@ -98,7 +93,7 @@ export const useTableStore = defineStore('table', () => {
       const updated = response.data?.data || response.data
       selectedTable.value = updated
       patchLocalTable(tableId, updated)
-      await syncTableFirestore(updated)
+      await syncTable(updated)
       return updated
     } catch (err) {
       error.value = err.response?.data?.error || 'Failed to assign table'
@@ -111,7 +106,7 @@ export const useTableStore = defineStore('table', () => {
       const response = await api.post(`/tables/${tableId}/release`)
       const updated = response.data?.data || response.data
       patchLocalTable(tableId, updated)
-      await syncTableFirestore(updated)
+      await syncTable(updated)
       return updated
     } catch (err) {
       error.value = 'Failed to release table'
@@ -156,13 +151,34 @@ export const useTableStore = defineStore('table', () => {
   }
 
   function subscribeToTables(options = {}) {
-    return subscribeFirestoreList('tables', (firestoreTables) => {
-      tables.value = firestoreTables.sort((a, b) => {
-        const left = Number(a.table_number || a.id || 0)
-        const right = Number(b.table_number || b.id || 0)
-        return left - right
-      })
-    }, options)
+    let unsubscribe = null
+    let closed = false
+
+    import('@/services/firebaseFirestoreService').then(({ subscribeFirestoreList }) => {
+      if (closed) return
+      unsubscribe = subscribeFirestoreList('tables', (firestoreTables) => {
+        tables.value = firestoreTables.sort((a, b) => {
+          const left = Number(a.table_number || a.id || 0)
+          const right = Number(b.table_number || b.id || 0)
+          return left - right
+        })
+      }, options)
+    })
+
+    return () => {
+      closed = true
+      unsubscribe?.()
+    }
+  }
+
+  async function syncTables(records) {
+    const { syncTablesFirestore } = await import('@/services/firebaseFirestoreService')
+    await syncTablesFirestore(records)
+  }
+
+  async function syncTable(table) {
+    const { syncTableFirestore } = await import('@/services/firebaseFirestoreService')
+    await syncTableFirestore(table)
   }
 
   return {

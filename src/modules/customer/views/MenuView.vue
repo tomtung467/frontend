@@ -380,8 +380,7 @@ onMounted(async () => {
   loading.value = true
   try {
     if (selectedTableId.value) cartStore.setTable(selectedTableId.value)
-    await Promise.all([menuStore.fetchCategories(), tableStore.fetchTables()])
-    unsubscribeTables = tableStore.subscribeToTables()
+    await Promise.all([menuStore.fetchCategories(), tableStore.fetchTables({}, { syncFirestore: false })])
     categories.value = menuStore.categories
     await loadAllFoods()
     await loadActiveInvoice()
@@ -550,7 +549,7 @@ async function sendAiQuestion() {
       id: Date.now() + 1,
       recommendations: response.data?.recommendations || [],
       role: 'assistant',
-      text: response.data?.reply || 'Mình chưa có đủ dữ liệu để trả lời câu này.',
+      text: response.data?.reply || 'Mình sẽ gợi ý dựa trên số liệu menu hiện có.',
     })
   } catch (err) {
     aiError.value = err.response?.data?.message || 'Không thể kết nối trợ lý AI lúc này.'
@@ -840,14 +839,14 @@ function formatPrice(price) {
 .cart-panel footer button:disabled { opacity: .55; cursor: not-allowed; }
 .floating-cart { display: none; }
 .ai-chat-toggle { position: fixed; right: 20px; bottom: 20px; z-index: 2200; display: grid; place-items: center; width: 54px; height: 54px; border: 0; border-radius: 999px; background: #151515; color: #fff; box-shadow: 0 16px 34px rgba(15, 23, 42, .24); cursor: pointer; }
-.ai-chat-panel { position: fixed; right: 20px; bottom: 86px; z-index: 2200; display: flex; flex-direction: column; width: min(380px, calc(100vw - 32px)); max-height: min(620px, calc(100vh - 116px)); border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; box-shadow: 0 24px 60px rgba(15, 23, 42, .24); overflow: hidden; }
+.ai-chat-panel { position: fixed; right: 20px; bottom: 86px; z-index: 2200; display: flex; flex-direction: column; width: min(400px, calc(100vw - 32px)); height: min(620px, calc(100vh - 116px)); border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; box-shadow: 0 24px 60px rgba(15, 23, 42, .24); overflow: hidden; }
 .ai-chat-panel header { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 58px; padding: 10px 14px; border-bottom: 1px solid #eaecf0; }
 .ai-chat-panel header strong, .ai-chat-panel header small { display: block; }
 .ai-chat-panel header small { margin-top: 2px; color: #667085; font-size: 12px; }
 .ai-chat-panel header button { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 999px; background: #f2f4f7; color: #475467; cursor: pointer; font-size: 22px; }
-.ai-suggestions { display: flex; gap: 8px; overflow-x: auto; padding: 10px 12px; border-bottom: 1px solid #f2f4f7; }
-.ai-suggestions button { flex: 0 0 auto; min-height: 32px; border: 1px solid #fed7aa; border-radius: 999px; background: #fff7ed; color: #c2410c; padding: 0 10px; cursor: pointer; font-weight: 800; font-size: 12px; }
-.ai-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 12px; min-height: 220px; }
+.ai-suggestions { flex: 0 0 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; padding: 10px 12px; border-bottom: 1px solid #f2f4f7; background: #fff; }
+.ai-suggestions button { min-width: 0; min-height: 34px; border: 1px solid #fed7aa; border-radius: 999px; background: #fff7ed; color: #c2410c; padding: 0 10px; cursor: pointer; font-weight: 800; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ai-messages { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 12px; }
 .ai-message { max-width: 86%; border-radius: 8px; padding: 9px 11px; white-space: pre-wrap; line-height: 1.45; font-size: 13px; }
 .ai-message p { margin: 0; }
 .ai-message.assistant { align-self: flex-start; background: #f2f4f7; color: #344054; }
@@ -857,7 +856,7 @@ function formatPrice(price) {
 .ai-recommendations button { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; width: 100%; min-height: 34px; border: 1px solid #fed7aa; border-radius: 7px; background: #fff; color: #344054; padding: 6px 8px; cursor: pointer; text-align: left; }
 .ai-recommendations span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; }
 .ai-recommendations strong { color: #ff5a00; font-size: 12px; white-space: nowrap; }
-.ai-input { display: grid; grid-template-columns: 1fr 40px; gap: 8px; padding: 10px; border-top: 1px solid #eaecf0; }
+.ai-input { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 40px; gap: 8px; padding: 10px; border-top: 1px solid #eaecf0; background: #fff; }
 .ai-input input { min-width: 0; height: 40px; border: 1px solid #d0d5dd; border-radius: 7px; padding: 0 10px; outline: 0; }
 .ai-input button { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 7px; background: #ff5a00; color: #fff; cursor: pointer; }
 .ai-input button:disabled { opacity: .55; cursor: not-allowed; }
@@ -894,5 +893,7 @@ function formatPrice(price) {
   .brand-block strong { max-width: 180px; }
   .mode-row { align-items: stretch; flex-direction: column; }
   .mode-switch { width: 100%; }
+  .ai-suggestions { grid-template-columns: 1fr; }
+  .ai-suggestions button { white-space: normal; border-radius: 8px; padding: 6px 10px; }
 }
 </style>

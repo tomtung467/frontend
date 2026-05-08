@@ -1,5 +1,4 @@
 import { initializeApp } from 'firebase/app'
-import { getAnalytics, isSupported } from 'firebase/analytics'
 import { getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
@@ -15,7 +14,3 @@ const firebaseConfig = {
 
 export const firebaseApp = initializeApp(firebaseConfig)
 export const firestoreDb = getFirestore(firebaseApp)
-
-export const analyticsReady = typeof window !== 'undefined'
-  ? isSupported().then((supported) => (supported ? getAnalytics(firebaseApp) : null))
-  : Promise.resolve(null)

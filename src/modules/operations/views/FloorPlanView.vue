@@ -252,9 +252,9 @@ const form = reactive(blankForm())
 let unsubscribeTables
 let unsubscribeKitchenQueue
 let clock
-let kitchenRefreshInterval
 let boardResizeObserver
 let gridPersistTimer
+let kitchenFallbackFetched = false
 const gridCell = reactive({ columns: 12, rows: 10, span: 3, padding: 18 })
 const boardSize = reactive({ width: 0, height: 0 })
 const gridColumns = computed(() => clamp(Number(gridCell.columns) || 12, 6, 32))
@@ -472,7 +472,7 @@ onMounted(async () => {
   if (boardRef.value) boardResizeObserver.observe(boardRef.value)
   unsubscribeTables = tableStore.subscribeToTables()
   unsubscribeKitchenQueue = kitchenStore.subscribeToQueue({
-    onUnavailable: startKitchenPolling,
+    onUnavailable: refreshKitchenOnceAfterStreamIssue,
   })
   clock = window.setInterval(() => {
     now.value = new Date()
@@ -484,7 +484,6 @@ onUnmounted(() => {
   unsubscribeKitchenQueue?.()
   boardResizeObserver?.disconnect()
   window.clearInterval(clock)
-  window.clearInterval(kitchenRefreshInterval)
   window.clearTimeout(gridPersistTimer)
 })
 
@@ -611,9 +610,10 @@ async function refreshServiceSources() {
   ])
 }
 
-function startKitchenPolling() {
-  if (kitchenRefreshInterval) return
-  kitchenRefreshInterval = window.setInterval(() => kitchenStore.fetchQueue(), 5000)
+async function refreshKitchenOnceAfterStreamIssue() {
+  if (kitchenFallbackFetched) return
+  kitchenFallbackFetched = true
+  await kitchenStore.fetchQueue()
 }
 
 function hideServedItems(ids) {

@@ -1,11 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '@/api'
-import {
-  subscribeFirestoreList,
-  syncKitchenQueueFirestore,
-  syncOrderFirestore,
-} from '@/services/firebaseFirestoreService'
 
 export const useKitchenStore = defineStore('kitchen', () => {
   const queue = ref([])
@@ -13,13 +8,16 @@ export const useKitchenStore = defineStore('kitchen', () => {
   const loading = ref(false)
   const error = ref(null)
 
-  async function fetchQueue() {
+  async function fetchQueue(options = {}) {
     loading.value = true
     error.value = null
     try {
       const response = await api.get('/kitchen/queue')
       queue.value = response.data?.data || response.data
-      await syncKitchenQueueFirestore(Array.isArray(queue.value) ? queue.value : [])
+      if (options.syncFirestore) {
+        const { syncKitchenQueueFirestore } = await import('@/services/firebaseFirestoreService')
+        await syncKitchenQueueFirestore(Array.isArray(queue.value) ? queue.value : [])
+      }
     } catch (err) {
       error.value = 'Failed to fetch kitchen queue'
       console.error(err)
@@ -50,7 +48,6 @@ export const useKitchenStore = defineStore('kitchen', () => {
       if (index !== -1) {
         queue.value[index] = updated
       }
-      await syncOrderFirestore(updated)
       return updated
     } catch (err) {
       error.value = 'Failed to update order status'
@@ -63,7 +60,6 @@ export const useKitchenStore = defineStore('kitchen', () => {
       const response = await api.put(`/kitchen/orders/${orderId}/complete`)
       const updated = response.data?.data || response.data
       queue.value = queue.value.filter(o => o.id !== orderId)
-      await syncOrderFirestore(updated)
       return updated
     } catch (err) {
       error.value = 'Failed to complete order'
@@ -84,25 +80,18 @@ export const useKitchenStore = defineStore('kitchen', () => {
   function subscribeToQueue(options = {}) {
     const token = localStorage.getItem('token')
     const streamUrl = `${api.defaults.baseURL}/kitchen/queue-stream?token=${encodeURIComponent(token || '')}`
-    let firestoreUnsubscribe
     let eventSource
-    let fallbackStarted = false
     let disposed = false
 
     function startFallback(error) {
-      if (fallbackStarted) return
-      fallbackStarted = true
-      firestoreUnsubscribe = subscribeFirestoreList('kitchenQueue', (firestoreQueue) => {
-        queue.value = firestoreQueue
-      }, {
-        onUnavailable: options.onUnavailable,
-      })
       options.onUnavailable?.(error)
     }
 
     if (typeof EventSource === 'undefined' || !token) {
       startFallback()
-      return () => firestoreUnsubscribe?.()
+      return () => {
+        disposed = true
+      }
     }
 
     eventSource = new EventSource(streamUrl)
@@ -119,13 +108,13 @@ export const useKitchenStore = defineStore('kitchen', () => {
     eventSource.onerror = (streamError) => {
       if (!disposed) {
         console.info('Kitchen queue stream reconnecting...', streamError)
+        startFallback(streamError)
       }
     }
 
     return () => {
       disposed = true
       eventSource?.close()
-      firestoreUnsubscribe?.()
     }
   }
 

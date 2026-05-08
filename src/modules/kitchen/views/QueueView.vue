@@ -48,9 +48,9 @@ import { useKitchenStore } from '@/stores/useKitchenStore'
 import { currentLanguage, t } from '@/languages'
 
 const kitchenStore = useKitchenStore()
-let refreshInterval
 let unsubscribeQueue
 let stopped = false
+let fallbackFetched = false
 
 const visibleQueue = computed(() =>
   kitchenStore.queue.filter((order) => orderItems(order).length > 0)
@@ -59,7 +59,7 @@ const visibleQueue = computed(() =>
 onMounted(async () => {
   await kitchenStore.fetchQueue()
   unsubscribeQueue = kitchenStore.subscribeToQueue({
-    onUnavailable: startPolling,
+    onUnavailable: refreshOnceAfterStreamIssue,
   })
 })
 
@@ -74,13 +74,13 @@ onUnmounted(() => {
 function stopRealtime() {
   if (stopped) return
   stopped = true
-  clearInterval(refreshInterval)
   unsubscribeQueue?.()
 }
 
-function startPolling() {
-  if (refreshInterval) return
-  refreshInterval = setInterval(() => kitchenStore.fetchQueue(), 5000)
+async function refreshOnceAfterStreamIssue() {
+  if (fallbackFetched || stopped) return
+  fallbackFetched = true
+  await kitchenStore.fetchQueue()
 }
 
 function orderItems(order) {
