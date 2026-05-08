@@ -185,7 +185,7 @@
       <span>{{ cartStore.itemCount }}</span>
     </button>
 
-    <button class="ai-chat-toggle" @click="aiChatOpen = !aiChatOpen">
+    <button class="ai-chat-toggle" @click="toggleAiChat">
       <v-icon size="24">{{ aiChatOpen ? 'mdi-close' : 'mdi-creation' }}</v-icon>
     </button>
 
@@ -195,7 +195,7 @@
           <strong>Trợ lý món ăn</strong>
           <small>Hỏi theo dữ liệu menu</small>
         </div>
-        <button @click="aiChatOpen = false">×</button>
+        <button @click="closeAiChat">×</button>
       </header>
 
       <div class="ai-suggestions">
@@ -206,7 +206,18 @@
 
       <div class="ai-messages">
         <article v-for="message in aiMessages" :key="message.id" :class="['ai-message', message.role]">
-          {{ message.text }}
+          <p>{{ message.text }}</p>
+          <div v-if="message.recommendations?.length" class="ai-recommendations">
+            <button
+              v-for="food in message.recommendations"
+              :key="food.id"
+              type="button"
+              @click="selectAiRecommendation(food)"
+            >
+              <span>{{ food.name }}</span>
+              <strong>{{ formatPrice(food.price) }}</strong>
+            </button>
+          </div>
         </article>
         <article v-if="aiLoading" class="ai-message assistant">Đang phân tích dữ liệu món ăn...</article>
         <article v-if="aiError" class="ai-message error">{{ aiError }}</article>
@@ -272,6 +283,7 @@ const aiSuggestions = [
   'Gợi ý món nhẹ dễ ăn',
   'Phân tích menu hôm nay',
 ]
+const aiSessionId = getAiSessionId()
 const activeInvoice = ref(null)
 const invoiceLoading = ref(false)
 const invoiceError = ref('')
@@ -412,6 +424,26 @@ function addToCart(food) {
   cartStore.addItem(food)
 }
 
+function getAiSessionId() {
+  const key = 'customer_ai_session_id'
+  const existing = localStorage.getItem(key)
+  if (existing) return existing
+
+  const next = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  localStorage.setItem(key, next)
+  return next
+}
+
+function toggleAiChat() {
+  aiChatOpen.value = !aiChatOpen.value
+  trackAiEvent(aiChatOpen.value ? 'open' : 'close')
+}
+
+function closeAiChat() {
+  aiChatOpen.value = false
+  trackAiEvent('close')
+}
+
 async function selectTable() {
   cartStore.setTable(selectedTableId.value)
   if (selectedTableId.value && route.params.tableId !== String(selectedTableId.value)) {
@@ -447,9 +479,14 @@ async function sendAiQuestion() {
   aiLoading.value = true
 
   try {
-    const response = await api.post('/customer/ai-chat', { message: question })
+    const response = await api.post('/customer/ai-chat', {
+      message: question,
+      table_id: selectedTableId.value || null,
+      session_id: aiSessionId,
+    })
     aiMessages.value.push({
       id: Date.now() + 1,
+      recommendations: response.data?.recommendations || [],
       role: 'assistant',
       text: response.data?.reply || 'Mình chưa có đủ dữ liệu để trả lời câu này.',
     })
@@ -457,6 +494,34 @@ async function sendAiQuestion() {
     aiError.value = err.response?.data?.message || 'Không thể kết nối trợ lý AI lúc này.'
   } finally {
     aiLoading.value = false
+  }
+}
+
+async function selectAiRecommendation(food) {
+  if (!food?.id) return
+
+  const fullFood = allFoods.value.find((item) => Number(item.id) === Number(food.id)) || food
+  addToCart(fullFood)
+
+  await trackAiEvent('select_recommendation', {
+    selected_food_ids: [Number(food.id)],
+    metadata: {
+      food_name: food.name,
+      source: 'assistant_card',
+    },
+  })
+}
+
+async function trackAiEvent(eventType, payload = {}) {
+  try {
+    await api.post('/customer/ai-events', {
+      event_type: eventType,
+      table_id: selectedTableId.value || null,
+      session_id: aiSessionId,
+      ...payload,
+    })
+  } catch (err) {
+    console.warn('AI event tracking failed', err)
   }
 }
 
@@ -707,9 +772,14 @@ function formatPrice(price) {
 .ai-suggestions button { flex: 0 0 auto; min-height: 32px; border: 1px solid #fed7aa; border-radius: 999px; background: #fff7ed; color: #c2410c; padding: 0 10px; cursor: pointer; font-weight: 800; font-size: 12px; }
 .ai-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 12px; min-height: 220px; }
 .ai-message { max-width: 86%; border-radius: 8px; padding: 9px 11px; white-space: pre-wrap; line-height: 1.45; font-size: 13px; }
+.ai-message p { margin: 0; }
 .ai-message.assistant { align-self: flex-start; background: #f2f4f7; color: #344054; }
 .ai-message.user { align-self: flex-end; background: #ff5a00; color: #fff; }
 .ai-message.error { align-self: stretch; max-width: none; background: #fef3f2; color: #b42318; }
+.ai-recommendations { display: grid; gap: 6px; margin-top: 8px; white-space: normal; }
+.ai-recommendations button { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; width: 100%; min-height: 34px; border: 1px solid #fed7aa; border-radius: 7px; background: #fff; color: #344054; padding: 6px 8px; cursor: pointer; text-align: left; }
+.ai-recommendations span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; }
+.ai-recommendations strong { color: #ff5a00; font-size: 12px; white-space: nowrap; }
 .ai-input { display: grid; grid-template-columns: 1fr 40px; gap: 8px; padding: 10px; border-top: 1px solid #eaecf0; }
 .ai-input input { min-width: 0; height: 40px; border: 1px solid #d0d5dd; border-radius: 7px; padding: 0 10px; outline: 0; }
 .ai-input button { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 7px; background: #ff5a00; color: #fff; cursor: pointer; }
