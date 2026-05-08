@@ -15,32 +15,32 @@
         <article v-for="column in columns" :key="column.key" class="kanban-column" :class="column.key">
           <header>
             <h2>{{ column.label }}</h2>
-            <span>{{ ordersByStatus(column.statuses).length }}</span>
+            <span>{{ ticketsByColumn(column.key).length }}</span>
           </header>
 
-          <div v-if="ordersByStatus(column.statuses).length === 0" class="empty-column">
+          <div v-if="ticketsByColumn(column.key).length === 0" class="empty-column">
             {{ t('kitchen.noTickets') }}
           </div>
 
-          <div v-for="order in ordersByStatus(column.statuses)" :key="order.id" class="order-card">
+          <div v-for="ticket in ticketsByColumn(column.key)" :key="ticket.id" class="order-card">
             <div class="order-topline">
-              <strong>{{ order.order_number || `${t('kitchen.order')} #${order.id}` }}</strong>
-              <span>{{ t('kitchen.table') }} {{ order.table_id }}</span>
+              <strong>{{ ticket.order_number || `${t('kitchen.order')} #${ticket.orderId}` }}</strong>
+              <span>{{ t('kitchen.table') }} {{ ticket.table_id }}</span>
             </div>
-            <div v-if="column.key === 'cooking'" class="timer">{{ getTimer(order) }}</div>
+            <div v-if="column.key === 'cooking'" class="timer">{{ getTimer(ticket) }}</div>
             <div class="order-items">
-              <div v-for="item in orderItems(order)" :key="item.id || item.food_id" class="item">
+              <div v-for="item in ticket.items" :key="item.id || item.food_id" class="item">
                 <span class="qty">{{ item.quantity }}x</span>
                 <span>{{ item.food?.name || item.food_name || item.name || `${t('menu.title')} #${item.food_id}` }}</span>
               </div>
             </div>
-            <p v-if="order.customer_notes || order.special_requests" class="notes">
-              {{ order.customer_notes || order.special_requests }}
+            <p v-if="ticket.customer_notes || ticket.special_requests" class="notes">
+              {{ ticket.customer_notes || ticket.special_requests }}
             </p>
-            <button v-if="column.next" class="ticket-action" @click="updateStatus(order.id, column.next.status)">
+            <button v-if="column.next" class="ticket-action" @click="updateTicketStatus(ticket, column.next.itemStatus)">
               {{ column.next.label }}
             </button>
-            <button v-else class="ticket-action done" @click="completeOrder(order.id)">
+            <button v-else class="ticket-action done" @click="updateTicketStatus(ticket, 'served')">
               {{ t('kitchen.markServed') }}
             </button>
           </div>
@@ -56,6 +56,7 @@ import { onBeforeRouteLeave } from 'vue-router'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { useKitchenStore } from '@/stores/useKitchenStore'
+import { kitchenAPI } from '@/api/kitchen'
 import { t } from '@/languages'
 
 const kitchenStore = useKitchenStore()
@@ -66,10 +67,45 @@ let unsubscribeQueue
 let stopped = false
 
 const columns = computed(() => [
-  { key: 'pending', label: t('kitchen.pending'), statuses: ['pending', 'confirmed'], next: { status: 'in_progress', label: t('kitchen.startCooking') } },
-  { key: 'cooking', label: t('kitchen.cooking'), statuses: ['in_progress'], next: { status: 'ready', label: t('kitchen.readyToServe') } },
+  { key: 'pending', label: t('kitchen.pending'), next: { itemStatus: 'preparing', label: t('kitchen.startCooking') } },
+  { key: 'cooking', label: t('kitchen.cooking'), next: { itemStatus: 'ready', label: t('kitchen.readyToServe') } },
   { key: 'ready', label: t('kitchen.ready'), statuses: ['ready'], next: null },
 ])
+
+const kitchenTickets = computed(() =>
+  kitchenStore.queue.flatMap((order) => {
+    const groups = {
+      pending: [],
+      cooking: [],
+      ready: [],
+    }
+
+    orderItems(order).forEach((item) => {
+      if (['pending', 'confirmed'].includes(item.status) || (!item.status && ['pending', 'confirmed'].includes(order.status))) {
+        groups.pending.push(item)
+      } else if (item.status === 'preparing' || (!item.status && order.status === 'in_progress')) {
+        groups.cooking.push(item)
+      } else if (item.status === 'ready' || (!item.status && order.status === 'ready')) {
+        groups.ready.push(item)
+      }
+    })
+
+    return Object.entries(groups)
+      .filter(([, items]) => items.length > 0)
+      .map(([column, items]) => ({
+        id: `${order.id}-${column}`,
+        orderId: order.id,
+        order_number: order.order_number,
+        table_id: order.table_id,
+        column,
+        items,
+        customer_notes: order.customer_notes,
+        special_requests: order.special_requests,
+        created_at: order.created_at,
+        updated_at: order.updated_at,
+      }))
+  })
+)
 
 onMounted(async () => {
   await kitchenStore.fetchQueue()
@@ -100,25 +136,23 @@ function startPolling() {
   refreshInterval = setInterval(() => kitchenStore.fetchQueue(), 5000)
 }
 
-function ordersByStatus(statuses) {
-  return kitchenStore.queue.filter((order) => statuses.includes(order.status))
+function ticketsByColumn(column) {
+  return kitchenTickets.value.filter((ticket) => ticket.column === column)
 }
 
 function orderItems(order) {
-  return order.order_items || order.orderItems || order.items || []
+  return (order.order_items || order.orderItems || order.items || [])
+    .filter((item) => item.status !== 'cancelled')
 }
 
 async function refreshQueue() {
   await kitchenStore.fetchQueue()
 }
 
-async function updateStatus(orderId, status) {
-  await kitchenStore.updateOrderStatus(orderId, status)
-  await kitchenStore.fetchQueue()
-}
-
-async function completeOrder(orderId) {
-  await kitchenStore.completeOrder(orderId)
+async function updateTicketStatus(ticket, status) {
+  await Promise.all(ticket.items.map((item) =>
+    kitchenAPI.updateOrderItemStatus(ticket.orderId, item.id, status)
+  ))
   await kitchenStore.fetchQueue()
 }
 

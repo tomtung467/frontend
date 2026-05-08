@@ -17,6 +17,10 @@ export const orderAPI = {
     return api.put(`/orders/${orderId}/status`, { status })
   },
 
+  updateOrderItemStatus(orderId, itemId, status) {
+    return api.put(`/orders/${orderId}/items/${itemId}/status`, { status })
+  },
+
   cancelOrder(orderId) {
     return api.post(`/orders/${orderId}/cancel`)
   },

@@ -22,10 +22,10 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-if="kitchenStore.queue.length === 0">
+            <tr v-if="visibleQueue.length === 0">
               <td colspan="5" class="empty">{{ t('kitchen.noKitchenTickets') }}</td>
             </tr>
-            <tr v-for="order in kitchenStore.queue" :key="order.id">
+            <tr v-for="order in visibleQueue" :key="order.id">
               <td>{{ order.order_number || `#${order.id}` }}</td>
               <td>{{ order.table_id }}</td>
               <td>{{ orderItems(order).length }}</td>
@@ -40,7 +40,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
@@ -51,6 +51,10 @@ const kitchenStore = useKitchenStore()
 let refreshInterval
 let unsubscribeQueue
 let stopped = false
+
+const visibleQueue = computed(() =>
+  kitchenStore.queue.filter((order) => orderItems(order).length > 0)
+)
 
 onMounted(async () => {
   await kitchenStore.fetchQueue()
@@ -80,7 +84,8 @@ function startPolling() {
 }
 
 function orderItems(order) {
-  return order.order_items || order.orderItems || order.items || []
+  return (order.order_items || order.orderItems || order.items || [])
+    .filter((item) => item.status !== 'cancelled')
 }
 
 function statusLabel(status) {

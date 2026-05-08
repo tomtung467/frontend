@@ -13,6 +13,10 @@ export const kitchenAPI = {
     return api.put(`/kitchen/orders/${orderId}/status`, { status })
   },
 
+  updateOrderItemStatus(orderId, itemId, status) {
+    return api.put(`/orders/${orderId}/items/${itemId}/status`, { status })
+  },
+
   getReadyOrders() {
     return api.get('/kitchen/ready-orders')
   },
