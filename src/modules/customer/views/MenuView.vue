@@ -81,8 +81,9 @@
         <p v-else-if="loading" class="state">{{ t('customer.loadingMenu') }}</p>
         <p v-else-if="filteredFoods.length === 0" class="state">{{ t('menu.noDishes') }}</p>
 
-        <div v-else class="foods-grid">
-          <article v-for="food in filteredFoods" :key="food.id" class="food-card">
+        <template v-else>
+        <div class="foods-grid">
+          <article v-for="food in paginatedFoods" :key="food.id" class="food-card">
             <img :src="dishImageUrl(food)" :alt="food.name || food.food_name" />
             <div class="food-info">
               <h3>{{ food.name || food.food_name }}</h3>
@@ -99,6 +100,16 @@
             </div>
           </article>
         </div>
+        <nav v-if="totalFoodPages > 1" class="menu-pagination" aria-label="Phan trang mon an">
+          <button :disabled="foodPage === 1" @click="setFoodPage(foodPage - 1)">
+            <v-icon size="22">mdi-chevron-left</v-icon>
+          </button>
+          <span>{{ foodPage }} / {{ totalFoodPages }}</span>
+          <button :disabled="foodPage === totalFoodPages" @click="setFoodPage(foodPage + 1)">
+            <v-icon size="22">mdi-chevron-right</v-icon>
+          </button>
+        </nav>
+        </template>
       </section>
 
       <button
@@ -173,11 +184,46 @@
       <v-icon size="24">mdi-cart-outline</v-icon>
       <span>{{ cartStore.itemCount }}</span>
     </button>
+
+    <button class="ai-chat-toggle" @click="aiChatOpen = !aiChatOpen">
+      <v-icon size="24">{{ aiChatOpen ? 'mdi-close' : 'mdi-creation' }}</v-icon>
+    </button>
+
+    <aside v-if="aiChatOpen" class="ai-chat-panel">
+      <header>
+        <div>
+          <strong>Trợ lý món ăn</strong>
+          <small>Hỏi theo dữ liệu menu</small>
+        </div>
+        <button @click="aiChatOpen = false">×</button>
+      </header>
+
+      <div class="ai-suggestions">
+        <button v-for="question in aiSuggestions" :key="question" @click="askSuggestion(question)">
+          {{ question }}
+        </button>
+      </div>
+
+      <div class="ai-messages">
+        <article v-for="message in aiMessages" :key="message.id" :class="['ai-message', message.role]">
+          {{ message.text }}
+        </article>
+        <article v-if="aiLoading" class="ai-message assistant">Đang phân tích dữ liệu món ăn...</article>
+        <article v-if="aiError" class="ai-message error">{{ aiError }}</article>
+      </div>
+
+      <form class="ai-input" @submit.prevent="sendAiQuestion">
+        <input v-model="aiQuestion" placeholder="Hỏi món phổ biến, ít đường, phù hợp trẻ em..." />
+        <button :disabled="aiLoading || !aiQuestion.trim()">
+          <v-icon size="20">mdi-send</v-icon>
+        </button>
+      </form>
+    </aside>
   </main>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import api from '@/api'
 import { useMenuStore } from '@/stores/useMenuStore'
 import { useCartStore } from '@/stores/useCartStore'
@@ -203,10 +249,29 @@ const selectedCategory = ref(null)
 const selectedTableId = ref(route.params.tableId || cartStore.tableId || '')
 const visitMode = ref('dine_in')
 const search = ref('')
+const foodPage = ref(1)
+const foodsPerPage = 10
 const cartPanelOpen = ref(false)
 const reservationOpen = ref(false)
 const loading = ref(false)
 const error = ref('')
+const aiChatOpen = ref(false)
+const aiQuestion = ref('')
+const aiLoading = ref(false)
+const aiError = ref('')
+const aiMessages = ref([
+  {
+    id: 1,
+    role: 'assistant',
+    text: 'Xin chào, mình có thể gợi ý món phổ biến, món nhẹ, món ít cay hoặc phân tích menu dựa trên dữ liệu hiện có.',
+  },
+])
+const aiSuggestions = [
+  'Món nào phổ biến nhất?',
+  'Món nào ít đường?',
+  'Gợi ý món nhẹ dễ ăn',
+  'Phân tích menu hôm nay',
+]
 const activeInvoice = ref(null)
 const invoiceLoading = ref(false)
 const invoiceError = ref('')
@@ -235,6 +300,23 @@ const filteredFoods = computed(() => {
     const haystack = `${food.name || food.food_name || ''} ${food.description || ''}`.toLowerCase()
     return !query || haystack.includes(query)
   })
+})
+
+const totalFoodPages = computed(() => Math.max(1, Math.ceil(filteredFoods.value.length / foodsPerPage)))
+
+const paginatedFoods = computed(() => {
+  const start = (foodPage.value - 1) * foodsPerPage
+  return filteredFoods.value.slice(start, start + foodsPerPage)
+})
+
+watch([search, selectedCategory], () => {
+  foodPage.value = 1
+})
+
+watch(totalFoodPages, (pages) => {
+  if (foodPage.value > pages) {
+    foodPage.value = pages
+  }
 })
 
 const activeInvoiceItems = computed(() =>
@@ -270,7 +352,13 @@ onUnmounted(() => {
 
 async function selectCategory(category) {
   selectedCategory.value = category
+  foodPage.value = 1
   error.value = ''
+}
+
+function setFoodPage(page) {
+  foodPage.value = Math.min(Math.max(page, 1), totalFoodPages.value)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 async function loadAllFoods() {
@@ -338,6 +426,38 @@ function cartQuantity(foodId) {
 
 function updateCartQuantity(foodId, quantity) {
   cartStore.updateQuantity(foodId, quantity)
+}
+
+function askSuggestion(question) {
+  aiQuestion.value = question
+  sendAiQuestion()
+}
+
+async function sendAiQuestion() {
+  const question = aiQuestion.value.trim()
+  if (!question || aiLoading.value) return
+
+  aiError.value = ''
+  aiMessages.value.push({
+    id: Date.now(),
+    role: 'user',
+    text: question,
+  })
+  aiQuestion.value = ''
+  aiLoading.value = true
+
+  try {
+    const response = await api.post('/customer/ai-chat', { message: question })
+    aiMessages.value.push({
+      id: Date.now() + 1,
+      role: 'assistant',
+      text: response.data?.reply || 'Mình chưa có đủ dữ liệu để trả lời câu này.',
+    })
+  } catch (err) {
+    aiError.value = err.response?.data?.message || 'Không thể kết nối trợ lý AI lúc này.'
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 async function checkout() {
@@ -537,6 +657,10 @@ function formatPrice(price) {
 .reservation-form button { border: 0; border-radius: 7px; background: #ff5a00; color: #fff; font-weight: 900; cursor: pointer; }
 .message { margin: 0 0 12px; color: #475467; font-size: 13px; }
 .foods-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.menu-pagination { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 18px 0 0; }
+.menu-pagination button { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid #e5e7eb; border-radius: 999px; background: #fff; color: #ff5a00; cursor: pointer; }
+.menu-pagination button:disabled { color: #98a2b3; background: #f2f4f7; cursor: not-allowed; }
+.menu-pagination span { min-width: 64px; text-align: center; color: #344054; font-weight: 900; }
 .food-card { overflow: hidden; display: flex; flex-direction: column; min-height: 294px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
 .food-card img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #f2f4f7; }
 .food-info { display: grid; gap: 8px; padding: 12px; }
@@ -573,10 +697,29 @@ function formatPrice(price) {
 .cart-panel footer button { width: 100%; min-height: 42px; border: 0; border-radius: 7px; background: #ff5a00; color: #fff; font-weight: 900; cursor: pointer; }
 .cart-panel footer button:disabled { opacity: .55; cursor: not-allowed; }
 .floating-cart { display: none; }
+.ai-chat-toggle { position: fixed; right: 20px; bottom: 20px; z-index: 2200; display: grid; place-items: center; width: 54px; height: 54px; border: 0; border-radius: 999px; background: #151515; color: #fff; box-shadow: 0 16px 34px rgba(15, 23, 42, .24); cursor: pointer; }
+.ai-chat-panel { position: fixed; right: 20px; bottom: 86px; z-index: 2200; display: flex; flex-direction: column; width: min(380px, calc(100vw - 32px)); max-height: min(620px, calc(100vh - 116px)); border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; box-shadow: 0 24px 60px rgba(15, 23, 42, .24); overflow: hidden; }
+.ai-chat-panel header { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 58px; padding: 10px 14px; border-bottom: 1px solid #eaecf0; }
+.ai-chat-panel header strong, .ai-chat-panel header small { display: block; }
+.ai-chat-panel header small { margin-top: 2px; color: #667085; font-size: 12px; }
+.ai-chat-panel header button { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 999px; background: #f2f4f7; color: #475467; cursor: pointer; font-size: 22px; }
+.ai-suggestions { display: flex; gap: 8px; overflow-x: auto; padding: 10px 12px; border-bottom: 1px solid #f2f4f7; }
+.ai-suggestions button { flex: 0 0 auto; min-height: 32px; border: 1px solid #fed7aa; border-radius: 999px; background: #fff7ed; color: #c2410c; padding: 0 10px; cursor: pointer; font-weight: 800; font-size: 12px; }
+.ai-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 12px; min-height: 220px; }
+.ai-message { max-width: 86%; border-radius: 8px; padding: 9px 11px; white-space: pre-wrap; line-height: 1.45; font-size: 13px; }
+.ai-message.assistant { align-self: flex-start; background: #f2f4f7; color: #344054; }
+.ai-message.user { align-self: flex-end; background: #ff5a00; color: #fff; }
+.ai-message.error { align-self: stretch; max-width: none; background: #fef3f2; color: #b42318; }
+.ai-input { display: grid; grid-template-columns: 1fr 40px; gap: 8px; padding: 10px; border-top: 1px solid #eaecf0; }
+.ai-input input { min-width: 0; height: 40px; border: 1px solid #d0d5dd; border-radius: 7px; padding: 0 10px; outline: 0; }
+.ai-input button { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 7px; background: #ff5a00; color: #fff; cursor: pointer; }
+.ai-input button:disabled { opacity: .55; cursor: not-allowed; }
 @media (max-width: 1100px) {
   .customer-layout { grid-template-columns: 124px minmax(0, 1fr); }
   .cart-panel { width: min(340px, 92vw); }
   .floating-cart { position: fixed; right: 18px; bottom: 18px; z-index: 2100; display: grid; place-items: center; width: 54px; height: 54px; border: 0; border-radius: 999px; background: #ff5a00; color: #fff; box-shadow: 0 14px 34px rgba(15, 23, 42, .24); }
+  .ai-chat-toggle { bottom: 84px; }
+  .ai-chat-panel { bottom: 150px; }
 }
 @media (max-width: 760px) {
   .customer-topbar { grid-template-columns: 1fr auto; }
