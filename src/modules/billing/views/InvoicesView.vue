@@ -51,7 +51,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="invoice in filteredInvoices" :key="invoice.id">
+            <tr v-for="invoice in paginatedInvoices" :key="invoice.id">
               <td><strong>{{ invoice.invoice_number }}</strong></td>
               <td>#{{ invoice.payment_id }}</td>
               <td>{{ formatCurrency(invoice.subtotal) }}</td>
@@ -65,12 +65,25 @@
         </table>
       </div>
 
+      <nav v-if="filteredInvoices.length" class="pagination">
+        <span>Tổng {{ filteredInvoices.length }},</span>
+        <span>Hiển thị</span>
+        <select v-model.number="pageSize">
+          <option :value="10">10</option>
+          <option :value="20">20</option>
+          <option :value="50">50</option>
+        </select>
+        <button class="page-button" :disabled="currentPage === 1" @click="currentPage--">‹</button>
+        <strong>{{ currentPage }}</strong>
+        <button class="page-button" :disabled="currentPage === totalPages" @click="currentPage++">›</button>
+      </nav>
+
     </main>
   </MasterLayout>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { showNotification } from '@/composables/usePopup'
@@ -84,6 +97,8 @@ const loading = ref(false)
 const error = ref('')
 const search = ref('')
 const statusFilter = ref('')
+const currentPage = ref(1)
+const pageSize = ref(10)
 
 const filteredInvoices = computed(() => {
   const query = search.value.trim().toLowerCase()
@@ -91,6 +106,18 @@ const filteredInvoices = computed(() => {
     const haystack = [invoice.invoice_number, invoice.payment_id, invoice.payment?.order?.order_number].join(' ').toLowerCase()
     return (!query || haystack.includes(query)) && (!statusFilter.value || invoice.status === statusFilter.value)
   })
+})
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredInvoices.value.length / pageSize.value)))
+const paginatedInvoices = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return filteredInvoices.value.slice(start, start + pageSize.value)
+})
+
+watch([search, statusFilter, pageSize], () => {
+  currentPage.value = 1
+})
+watch(totalPages, (pages) => {
+  if (currentPage.value > pages) currentPage.value = pages
 })
 
 onMounted(loadInvoices)
@@ -139,6 +166,7 @@ function formatCurrency(value) {
 function formatDate(value) {
   return value ? new Intl.DateTimeFormat(locale(), { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : '-'
 }
+
 </script>
 
 <style scoped>
@@ -165,5 +193,10 @@ th { color: #667085; font-size: 12px; text-transform: uppercase; background: #f9
 .badge.paid { background: #ecfdf3; color: #027a48; }
 .badge.overdue, .badge.cancelled { background: #fef3f2; color: #b42318; }
 .badge.draft { background: #f2f4f7; color: #344054; }
+.pagination { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 14px; color: #344054; }
+.pagination select { width: 74px; min-height: 34px; }
+.pagination strong { display: grid; place-items: center; min-width: 34px; height: 34px; border-radius: 6px; background: #f2f4f7; color: #111827; }
+.page-button { min-width: 34px; min-height: 34px; padding: 0; background: transparent; color: #98a2b3; font-size: 24px; }
+.page-button:not(:disabled) { color: #344054; }
 @media (max-width: 720px) { .ops-page { padding: 16px; } .toolbar input { min-width: 100%; } }
 </style>

@@ -41,7 +41,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="payment in filteredPayments" :key="payment.id">
+            <tr v-for="payment in paginatedPayments" :key="payment.id">
               <td>#{{ payment.id }}</td>
               <td>{{ payment.order?.order_number || payment.order_id }}</td>
               <td>{{ paymentMethodLabel(payment.payment_method) }}</td>
@@ -52,6 +52,19 @@
           </tbody>
         </table>
       </div>
+
+      <nav v-if="filteredPayments.length" class="pagination">
+        <span>Tổng {{ filteredPayments.length }},</span>
+        <span>Hiển thị</span>
+        <select v-model.number="pageSize">
+          <option :value="10">10</option>
+          <option :value="20">20</option>
+          <option :value="50">50</option>
+        </select>
+        <button class="page-button" :disabled="currentPage === 1" @click="currentPage--">‹</button>
+        <strong>{{ currentPage }}</strong>
+        <button class="page-button" :disabled="currentPage === totalPages" @click="currentPage++">›</button>
+      </nav>
 
       <Teleport to="body">
         <transition name="drawer-fade">
@@ -102,7 +115,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import { showNotification } from '@/composables/usePopup'
@@ -116,6 +129,8 @@ const saving = ref(false)
 const error = ref('')
 const search = ref('')
 const methodFilter = ref('')
+const currentPage = ref(1)
+const pageSize = ref(10)
 const formModalOpen = ref(false)
 const form = reactive({ order_id: null, amount: null, payment_method: 'cash', reference_code: '' })
 
@@ -131,6 +146,18 @@ const filteredPayments = computed(() => {
     const haystack = [payment.id, payment.order_id, payment.order?.order_number, payment.reference_code].join(' ').toLowerCase()
     return (!query || haystack.includes(query)) && (!methodFilter.value || payment.payment_method === methodFilter.value)
   })
+})
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredPayments.value.length / pageSize.value)))
+const paginatedPayments = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return filteredPayments.value.slice(start, start + pageSize.value)
+})
+
+watch([search, methodFilter, pageSize], () => {
+  currentPage.value = 1
+})
+watch(totalPages, (pages) => {
+  if (currentPage.value > pages) currentPage.value = pages
 })
 
 onMounted(loadPayments)
@@ -212,6 +239,7 @@ function formatCurrency(value) {
 function formatDate(value) {
   return value ? new Intl.DateTimeFormat(locale(), { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : '-'
 }
+
 </script>
 
 <style scoped>
@@ -251,5 +279,10 @@ th { color: #667085; font-size: 12px; text-transform: uppercase; background: #f9
 .drawer-fade-enter-active .entity-drawer, .drawer-fade-leave-active .entity-drawer { transition: transform .2s ease; }
 .drawer-fade-enter-from, .drawer-fade-leave-to { opacity: 0; }
 .drawer-fade-enter-from .entity-drawer, .drawer-fade-leave-to .entity-drawer { transform: translateX(28px); }
+.pagination { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 14px; color: #344054; }
+.pagination select { width: 74px; min-height: 34px; flex: none; }
+.pagination strong { display: grid; place-items: center; min-width: 34px; height: 34px; border-radius: 6px; background: #f2f4f7; color: #111827; }
+.page-button { min-width: 34px; min-height: 34px; padding: 0; background: transparent; color: #98a2b3; font-size: 24px; }
+.page-button:not(:disabled) { color: #344054; }
 @media (max-width: 720px) { .ops-page { padding: 16px; } .header-controls, .header-controls input, .header-controls select { width: 100%; } }
 </style>

@@ -40,7 +40,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in filteredInventory" :key="item.id">
+            <tr v-for="item in paginatedInventory" :key="item.id">
               <td>
                 <strong>{{ item.name }}</strong>
                 <small>{{ item.description || t('inventory.noNotes') }}</small>
@@ -75,6 +75,19 @@
           </tbody>
         </table>
       </div>
+
+      <nav v-if="filteredInventory.length > pageSize" class="pagination">
+        <span>Tổng {{ filteredInventory.length }},</span>
+        <span>Hiển thị</span>
+        <select v-model.number="pageSize">
+          <option :value="10">10</option>
+          <option :value="20">20</option>
+          <option :value="50">50</option>
+        </select>
+        <button class="page-button" :disabled="currentPage === 1" @click="currentPage--">‹</button>
+        <strong>{{ currentPage }}</strong>
+        <button class="page-button" :disabled="currentPage === totalPages" @click="currentPage++">›</button>
+      </nav>
 
       <Teleport to="body">
         <transition name="drawer-fade">
@@ -144,7 +157,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
 import UiPopup from '@/components/common/UiPopup.vue'
@@ -159,6 +172,8 @@ const saving = ref(false)
 const error = ref('')
 const search = ref('')
 const stockFilter = ref('all')
+const currentPage = ref(1)
+const pageSize = ref(10)
 const editingId = ref(null)
 const formModalOpen = ref(false)
 const adjustments = reactive({})
@@ -191,6 +206,18 @@ const filteredInventory = computed(() => {
     const matchesStock = stockFilter.value === 'all' || isLowStock(item)
     return matchesSearch && matchesStock
   })
+})
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredInventory.value.length / pageSize.value)))
+const paginatedInventory = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return filteredInventory.value.slice(start, start + pageSize.value)
+})
+
+watch([search, stockFilter, pageSize], () => {
+  currentPage.value = 1
+})
+watch(totalPages, (pages) => {
+  if (currentPage.value > pages) currentPage.value = pages
 })
 
 const lowStockCount = computed(() => inventory.value.filter(isLowStock).length)
@@ -347,6 +374,7 @@ function formatCurrency(value) {
 function number(value) {
   return new Intl.NumberFormat(locale(), { maximumFractionDigits: 2 }).format(Number(value || 0))
 }
+
 </script>
 
 <style scoped>
@@ -399,5 +427,10 @@ td small { color: #667085; margin-top: 3px; }
 .drawer-fade-enter-active .entity-drawer, .drawer-fade-leave-active .entity-drawer { transition: transform .2s ease; }
 .drawer-fade-enter-from, .drawer-fade-leave-to { opacity: 0; }
 .drawer-fade-enter-from .entity-drawer, .drawer-fade-leave-to .entity-drawer { transform: translateX(28px); }
+.pagination { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 14px; color: #344054; }
+.pagination select { width: 74px; min-height: 34px; flex: none; }
+.pagination strong { display: grid; place-items: center; min-width: 34px; height: 34px; border-radius: 6px; background: #f2f4f7; color: #111827; }
+.page-button { min-width: 34px; min-height: 34px; padding: 0; background: transparent; color: #98a2b3; font-size: 24px; }
+.page-button:not(:disabled) { color: #344054; }
 @media (max-width: 720px) { .ops-page { padding: 16px; } .summary-strip { gap: 10px; } .header-controls, .header-controls input, .header-controls select { width: 100%; } .form-row { grid-template-columns: 1fr; } }
 </style>

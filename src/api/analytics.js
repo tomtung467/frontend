@@ -17,6 +17,10 @@ export const analyticsAPI = {
     return api.get('/analytics/orders', { params })
   },
 
+  getInventoryAnalytics(params = {}) {
+    return api.get('/analytics/inventory', { params })
+  },
+
   getEmployeePerformance(params = {}) {
     return api.get('/analytics/employees', { params })
   },

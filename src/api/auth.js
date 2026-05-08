@@ -18,6 +18,19 @@ export const authAPI = {
     return api.post('/auth/logout')
   },
 
+  forgotPassword(email) {
+    return api.post('/auth/forgot-password', { email })
+  },
+
+  resetPassword(email, token, password, passwordConfirmation) {
+    return api.post('/auth/reset-password', {
+      email,
+      token,
+      password,
+      password_confirmation: passwordConfirmation,
+    })
+  },
+
   refreshToken() {
     return api.post('/auth/refresh')
   },

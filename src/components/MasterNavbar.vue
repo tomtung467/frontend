@@ -64,25 +64,41 @@
       <v-spacer />
 
       <div class="navbar-actions">
-        <v-tooltip text="Search" location="bottom">
+        <v-menu location="bottom end" origin="top end" transition="scale-transition" :close-on-content-click="false">
           <template #activator="{ props }">
-            <v-btn v-bind="props" icon size="small" class="action-icon-btn" @click="searchExpanded = !searchExpanded">
-              <v-icon>mdi-magnify</v-icon>
+            <v-btn v-bind="props" icon size="small" class="action-icon-btn notification-btn">
+              <v-badge
+                v-if="recentActivities.length"
+                :content="recentActivities.length > 9 ? '9+' : recentActivities.length"
+                color="error"
+                offset-x="-2"
+                offset-y="-2"
+              >
+                <v-icon>mdi-bell-outline</v-icon>
+              </v-badge>
+              <v-icon v-else>mdi-bell-outline</v-icon>
             </v-btn>
           </template>
-        </v-tooltip>
-        <v-text-field
-          v-if="searchExpanded"
-          v-model="searchQuery"
-          @keyup.enter="handleSearch"
-          @blur="searchExpanded = false"
-          placeholder="Search"
-          density="compact"
-          variant="outlined"
-          hide-details
-          class="search-field"
-          autofocus
-        />
+
+          <v-card class="activity-menu" width="360">
+            <header class="activity-header">
+              <strong>{{ t('common.recentChanges') }}</strong>
+              <button v-if="recentActivities.length" @click="clearActivities">{{ t('common.clear') }}</button>
+            </header>
+            <v-divider />
+            <div v-if="recentActivities.length" class="activity-list">
+              <article v-for="activity in recentActivities" :key="activity.id" class="activity-item">
+                <span class="activity-dot"></span>
+                <div>
+                  <strong>{{ activity.title }}</strong>
+                  <p v-if="activity.message">{{ activity.message }}</p>
+                  <small>{{ formatActivityTime(activity.timestamp) }}</small>
+                </div>
+              </article>
+            </div>
+            <p v-else class="activity-empty">{{ t('common.noRecentChanges') }}</p>
+          </v-card>
+        </v-menu>
 
         <v-divider vertical class="mx-2 opacity-50" />
         <MenuUser v-if="authStore.user" :user="authStore.user" @logout="handleLogout" />
@@ -124,7 +140,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 import { useAuthStore } from '@/stores/useAuthStore'
@@ -138,13 +154,14 @@ const router = useRouter()
 const route = useRoute()
 const { smAndDown } = useDisplay()
 
-const searchQuery = ref('')
-const searchExpanded = ref(false)
 const mobileDrawer = ref(false)
+const recentActivities = ref([])
 
 const visibleNavItems = computed(() => getVisibleNavItems(authStore.user?.role || 'customer'))
 
 onMounted(async () => {
+  loadActivities()
+  window.addEventListener('restaurant-activity', recordActivity)
   if (!authStore.user && authStore.isAuthenticated) {
     try {
       await authStore.getCurrentUser()
@@ -152,6 +169,10 @@ onMounted(async () => {
       console.error('Failed to load user:', err)
     }
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('restaurant-activity', recordActivity)
 })
 
 function goHome() {
@@ -168,15 +189,39 @@ function navigateTo(path) {
   router.push(path)
 }
 
-function handleSearch() {
-  const query = searchQuery.value.trim()
-  if (!query) return
-  const firstMatch = visibleNavItems.value.find((item) => navLabel(item).toLowerCase().includes(query.toLowerCase()))
-  if (firstMatch) router.push(firstMatch.path)
-}
-
 function navLabel(item) {
   return item.labelKey ? t(item.labelKey) : item.label
+}
+
+function loadActivities() {
+  try {
+    recentActivities.value = JSON.parse(localStorage.getItem('restaurant-recent-activities') || '[]')
+  } catch {
+    recentActivities.value = []
+  }
+}
+
+function recordActivity(event) {
+  const detail = event.detail || {}
+  if (!detail.title && !detail.message) return
+  const activity = {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    title: detail.title || t('common.saved'),
+    message: detail.message || '',
+    timestamp: detail.timestamp || new Date().toISOString(),
+  }
+  recentActivities.value = [activity, ...recentActivities.value].slice(0, 8)
+  localStorage.setItem('restaurant-recent-activities', JSON.stringify(recentActivities.value))
+}
+
+function clearActivities() {
+  recentActivities.value = []
+  localStorage.removeItem('restaurant-recent-activities')
+}
+
+function formatActivityTime(value) {
+  if (!value) return ''
+  return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(new Date(value))
 }
 
 async function handleLogout() {
@@ -276,18 +321,6 @@ async function handleLogout() {
 .mobile-menu-btn:hover {
   background-color: rgba(255, 255, 255, .18) !important;
 }
-.search-field {
-  width: 190px;
-  background: rgba(255, 255, 255, .12);
-  border-radius: 6px;
-}
-.search-field :deep(.v-field__input) {
-  color: white;
-  font-size: 13px;
-}
-.search-field :deep(.v-field__input)::placeholder {
-  color: rgba(255, 255, 255, .72);
-}
 @media (max-width: 960px) {
   .master-navbar {
     min-width: 0;
@@ -308,9 +341,6 @@ async function handleLogout() {
     min-width: 0;
   }
 
-  .search-field {
-    display: none;
-  }
 }
 
 @media (max-width: 520px) {
@@ -318,14 +348,92 @@ async function handleLogout() {
     padding: 0 8px;
   }
 
-  .navbar-actions :deep(.v-divider),
-  .navbar-actions .action-icon-btn {
+  .navbar-actions :deep(.v-divider) {
     display: none;
   }
 
   .navbar-actions :deep(.user-name-text) {
     display: none;
   }
+}
+
+.notification-btn :deep(.v-badge__badge) {
+  font-size: 10px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+}
+
+.activity-menu {
+  overflow: hidden;
+}
+
+.activity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+}
+
+.activity-header strong {
+  color: #101828;
+  font-size: 15px;
+}
+
+.activity-header button {
+  border: 0;
+  background: transparent;
+  color: #155eef;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.activity-list {
+  display: grid;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.activity-item {
+  display: grid;
+  grid-template-columns: 10px 1fr;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #eaecf0;
+}
+
+.activity-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: #155eef;
+}
+
+.activity-item strong {
+  display: block;
+  color: #101828;
+  font-size: 14px;
+}
+
+.activity-item p {
+  margin: 2px 0 0;
+  color: #475467;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.activity-item small {
+  display: block;
+  margin-top: 5px;
+  color: #98a2b3;
+}
+
+.activity-empty {
+  margin: 0;
+  padding: 18px 14px;
+  color: #667085;
 }
 
 .mobile-nav-drawer {

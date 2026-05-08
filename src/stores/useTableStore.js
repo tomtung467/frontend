@@ -45,10 +45,7 @@ export const useTableStore = defineStore('table', () => {
     try {
       const response = await api.put(`/tables/${tableId}/status`, { status })
       const updated = response.data?.data || response.data
-      const index = tables.value.findIndex(t => t.id === tableId)
-      if (index !== -1) {
-        tables.value[index] = updated
-      }
+      patchLocalTable(tableId, updated)
       await syncTableFirestore(updated)
       return updated
     } catch (err) {
@@ -58,11 +55,49 @@ export const useTableStore = defineStore('table', () => {
     }
   }
 
+  async function createTable(data) {
+    try {
+      const response = await api.post('/tables', data)
+      const created = response.data?.data || response.data
+      tables.value = [...tables.value, created]
+      await syncTableFirestore(created)
+      return created
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to create table'
+      throw err
+    }
+  }
+
+  async function updateTable(tableId, data) {
+    try {
+      const response = await api.put(`/tables/${tableId}`, data)
+      const updated = response.data?.data || response.data
+      const merged = patchLocalTable(tableId, updated)
+      await syncTableFirestore(merged || updated)
+      return updated
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to update table'
+      throw err
+    }
+  }
+
+  async function deleteTable(tableId) {
+    try {
+      await api.delete(`/tables/${tableId}`)
+      tables.value = tables.value.filter(t => t.id !== tableId)
+      await syncTablesFirestore(tables.value)
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to delete table'
+      throw err
+    }
+  }
+
   async function assignTable(tableId, numberOfGuests) {
     try {
       const response = await api.post(`/tables/${tableId}/assign`, { number_of_guests: numberOfGuests })
       const updated = response.data?.data || response.data
       selectedTable.value = updated
+      patchLocalTable(tableId, updated)
       await syncTableFirestore(updated)
       return updated
     } catch (err) {
@@ -75,6 +110,7 @@ export const useTableStore = defineStore('table', () => {
     try {
       const response = await api.post(`/tables/${tableId}/release`)
       const updated = response.data?.data || response.data
+      patchLocalTable(tableId, updated)
       await syncTableFirestore(updated)
       return updated
     } catch (err) {
@@ -89,11 +125,30 @@ export const useTableStore = defineStore('table', () => {
         primary_table_id: primaryTableId,
         merged_table_ids: mergedTableIds,
       })
+      await fetchTables()
       return response.data
     } catch (err) {
       error.value = 'Failed to merge tables'
       throw err
     }
+  }
+
+  async function unmergeTables(primaryTableId) {
+    try {
+      const response = await api.post(`/tables/merge/${primaryTableId}/unmerge`)
+      await fetchTables()
+      return response.data
+    } catch (err) {
+      error.value = 'Failed to unmerge tables'
+      throw err
+    }
+  }
+
+  function patchLocalTable(tableId, data) {
+    const index = tables.value.findIndex(t => t.id === tableId)
+    if (index === -1) return null
+    tables.value[index] = { ...tables.value[index], ...data }
+    return tables.value[index]
   }
 
   function selectTable(table) {
@@ -118,9 +173,13 @@ export const useTableStore = defineStore('table', () => {
     fetchTables,
     getTableDetails,
     updateTableStatus,
+    createTable,
+    updateTable,
+    deleteTable,
     assignTable,
     releaseTable,
     mergeTables,
+    unmergeTables,
     selectTable,
     subscribeToTables,
   }

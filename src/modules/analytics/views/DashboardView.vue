@@ -117,6 +117,7 @@ const dashboardData = ref({})
 const tables = ref([])
 const orders = ref([])
 const inventory = ref([])
+const lowStockInventory = ref([])
 const payments = ref([])
 
 const activeTables = computed(() =>
@@ -124,8 +125,8 @@ const activeTables = computed(() =>
 )
 const recentOrders = computed(() => orders.value.slice(0, 5))
 const recentPayments = computed(() => payments.value.slice(0, 5))
-const lowStockItems = computed(() => inventory.value.filter(isLowStock).slice(0, 5))
-const lowStockCount = computed(() => inventory.value.filter(isLowStock).length)
+const lowStockItems = computed(() => lowStockInventory.value.slice(0, 5))
+const lowStockCount = computed(() => lowStockInventory.value.length)
 const pendingOrders = computed(() => orders.value.filter((order) => ['pending', 'confirmed', 'in_progress'].includes(order.status)).length)
 const readyOrders = computed(() => orders.value.filter((order) => ['ready', 'served'].includes(order.status)).length)
 const paymentRequests = computed(() => activeTables.value.filter((table) => table.payment_requested_at).length)
@@ -168,6 +169,7 @@ async function loadDashboard() {
     tableService.getAllTables({ summary: 1 }),
     orderService.getOrders({ summary: 1, limit: 8 }),
     inventoryService.getInventory({ summary: 1, limit: 8 }),
+    inventoryService.getLowStockItems(),
     paymentService.getPayments({ summary: 1, limit: 5 }),
   ])
 
@@ -179,7 +181,8 @@ async function loadDashboard() {
   tables.value = normalizeList(results[1].value)
   orders.value = normalizeList(results[2].value)
   inventory.value = normalizeList(results[3].value)
-  payments.value = normalizeList(results[4].value)
+  lowStockInventory.value = normalizeList(results[4].value).filter(isLowStock)
+  payments.value = normalizeList(results[5].value)
 }
 
 function normalizeList(value) {

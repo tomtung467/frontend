@@ -42,6 +42,14 @@ export default class AnalyticsService extends BaseService {
   }
 
   /**
+   * Get inventory analytics
+   * @param {Object} filters - { start_date, end_date }
+   */
+  async getInventoryAnalytics(filters = {}) {
+    return this.get('/inventory', { params: filters })
+  }
+
+  /**
    * Get employee performance data
    * @param {Object} filters - { department_id, from_date, to_date }
    */

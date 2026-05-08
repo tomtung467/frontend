@@ -29,10 +29,11 @@ let nextId = 1
 function notify(event) {
   const detail = event.detail || {}
   if (isRouteCancelNotice(detail)) return
+  if (!['danger', 'error', 'warning'].includes(detail.type)) return
   const id = nextId++
   const note = {
     id,
-    type: detail.type || 'info',
+    type: detail.type === 'error' ? 'danger' : detail.type || 'warning',
     title: detail.title || '',
     message: detail.message || '',
   }

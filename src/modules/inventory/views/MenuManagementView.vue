@@ -10,17 +10,44 @@
               <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
             </select>
           </div>
+          <button class="ghost-action" @click="categoriesOpen = !categoriesOpen">
+            Danh mục
+          </button>
           <button class="primary-action" @click="openCreateModal">
             {{ t('menu.addDish') }}
           </button>
+          <button class="secondary-action" @click="openCreateCategoryModal">
+            Thêm danh mục
+          </button>
         </template>
       </MasterPageHeader>
+
+      <section v-if="categoriesOpen && categories.length" class="category-manager">
+        <header>
+          <h2>Danh mục</h2>
+          <span>{{ categories.length }} danh mục</span>
+        </header>
+        <div class="category-list">
+          <article v-for="category in categories" :key="category.id" class="category-chip">
+            <div>
+              <strong>{{ category.name }}</strong>
+              <small>{{ category.foods_count || 0 }} món</small>
+            </div>
+            <div class="chip-actions">
+              <button class="ghost-action" @click="openEditCategoryModal(category)">Sửa</button>
+              <button class="danger" :disabled="saving || Number(category.foods_count || 0) > 0" @click="askDeleteCategory(category)">
+                Xóa
+              </button>
+            </div>
+          </article>
+        </div>
+      </section>
 
       <p v-if="loading" class="state">{{ t('menu.loading') }}</p>
       <p v-else-if="filteredFoods.length === 0" class="state">{{ t('menu.noDishes') }}</p>
 
       <div v-else class="menu-grid">
-        <article v-for="food in filteredFoods" :key="food.id" class="dish">
+        <article v-for="food in paginatedFoods" :key="food.id" class="dish">
           <div>
             <img class="dish-image" :src="dishImageUrl(food)" :alt="food.name || food.food_name" />
             <div class="dish-title">
@@ -41,6 +68,19 @@
           </div>
         </article>
       </div>
+
+      <nav v-if="filteredFoods.length > pageSize" class="pagination">
+        <span>Tổng {{ filteredFoods.length }},</span>
+        <span>Hiển thị</span>
+        <select v-model.number="pageSize">
+          <option :value="8">8</option>
+          <option :value="16">16</option>
+          <option :value="24">24</option>
+        </select>
+        <button class="page-button" :disabled="currentPage === 1" @click="currentPage--">‹</button>
+        <strong>{{ currentPage }}</strong>
+        <button class="page-button" :disabled="currentPage === totalPages" @click="currentPage++">›</button>
+      </nav>
 
       <Teleport to="body">
         <transition name="drawer-fade">
@@ -112,6 +152,52 @@
         </transition>
       </Teleport>
 
+      <Teleport to="body">
+        <transition name="drawer-fade">
+          <div v-if="categoryModalOpen" class="drawer-backdrop" @click.self="closeCategoryModal">
+            <aside class="dish-drawer" role="dialog" aria-modal="true">
+              <header class="drawer-header">
+                <div>
+                  <h2>{{ editingCategoryId ? 'Cập nhật danh mục' : 'Thêm danh mục' }}</h2>
+                  <p>{{ editingCategoryId ? categoryForm.name : 'Nhập thông tin danh mục mới.' }}</p>
+                </div>
+                <button class="icon-action" type="button" aria-label="Close" @click="closeCategoryModal">&times;</button>
+              </header>
+
+              <form class="drawer-form" @submit.prevent="saveCategory">
+                <label>
+                  <span>Tên danh mục</span>
+                  <input v-model="categoryForm.name" required placeholder="Tên danh mục" />
+                </label>
+
+                <label>
+                  <span>Mô tả</span>
+                  <textarea v-model="categoryForm.description" placeholder="Mô tả"></textarea>
+                </label>
+
+                <div class="form-row">
+                  <label>
+                    <span>Thứ tự hiển thị</span>
+                    <input v-model.number="categoryForm.display_order" type="number" placeholder="0" />
+                  </label>
+                  <label class="checkbox category-active">
+                    <input v-model="categoryForm.is_active" type="checkbox" />
+                    Đang hiển thị
+                  </label>
+                </div>
+
+                <footer class="drawer-actions">
+                  <button type="button" class="ghost-action" @click="closeCategoryModal">{{ t('user.cancel') }}</button>
+                  <button class="primary-action" :disabled="saving">
+                    {{ saving ? t('menu.saving') : editingCategoryId ? 'Cập nhật danh mục' : 'Thêm danh mục' }}
+                  </button>
+                </footer>
+              </form>
+            </aside>
+          </div>
+        </transition>
+      </Teleport>
+
       <UiPopup
         v-model="popup.open"
         :type="popup.type"
@@ -127,7 +213,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { isAbortError } from '@/api/requestManager'
 import MasterLayout from '@/components/MasterLayout.vue'
 import MasterPageHeader from '@/components/MasterPageHeader.vue'
@@ -144,11 +230,17 @@ const saving = ref(false)
 const error = ref('')
 const search = ref('')
 const categoryFilter = ref('')
+const categoriesOpen = ref(false)
+const currentPage = ref(1)
+const pageSize = ref(8)
 const editingId = ref(null)
+const editingCategoryId = ref(null)
 const formModalOpen = ref(false)
+const categoryModalOpen = ref(false)
 const fileInput = ref(null)
 const selectedImageFile = ref(null)
 const pendingDelete = ref(null)
+const pendingDeleteCategory = ref(null)
 const popup = reactive({
   open: false,
   type: 'info',
@@ -171,6 +263,14 @@ const blankForm = {
 }
 const form = reactive({ ...blankForm })
 
+const blankCategoryForm = {
+  name: '',
+  description: '',
+  display_order: 0,
+  is_active: true,
+}
+const categoryForm = reactive({ ...blankCategoryForm })
+
 const filteredFoods = computed(() => {
   const query = search.value.trim().toLowerCase()
   return foods.value.filter((food) => {
@@ -179,6 +279,18 @@ const filteredFoods = computed(() => {
     const matchesCategory = !categoryFilter.value || Number(food.category_id) === Number(categoryFilter.value)
     return matchesSearch && matchesCategory
   })
+})
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredFoods.value.length / pageSize.value)))
+const paginatedFoods = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return filteredFoods.value.slice(start, start + pageSize.value)
+})
+
+watch([search, categoryFilter, pageSize], () => {
+  currentPage.value = 1
+})
+watch(totalPages, (pages) => {
+  if (currentPage.value > pages) currentPage.value = pages
 })
 
 onMounted(loadData)
@@ -189,7 +301,7 @@ async function loadData() {
   try {
     const [foodList, categoryList] = await Promise.all([
       menuService.getFoods({ fields: 'id,name,price,category_id,description,is_available,is_popular,image_url,preparation_time' }),
-      menuService.getCategories({ simple: 1 }),
+      menuService.getCategories(),
     ])
     foods.value = foodList
     categories.value = categoryList
@@ -198,6 +310,27 @@ async function loadData() {
     error.value = err.message || t('menu.failedLoad')
   } finally {
     loading.value = false
+  }
+}
+
+async function saveCategory() {
+  if (!categoryForm.name) return
+  saving.value = true
+  error.value = ''
+  const wasEditing = Boolean(editingCategoryId.value)
+  try {
+    if (editingCategoryId.value) {
+      await menuService.updateCategory(editingCategoryId.value, { ...categoryForm })
+    } else {
+      await menuService.createCategory({ ...categoryForm })
+    }
+    closeCategoryModal()
+    await loadData()
+    showPopup('success', t('common.saved'), wasEditing ? 'Đã cập nhật danh mục.' : 'Đã thêm danh mục.')
+  } catch (err) {
+    showPopup('danger', t('common.error'), err.message || 'Không thể lưu danh mục.')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -229,6 +362,22 @@ function openCreateModal() {
   formModalOpen.value = true
 }
 
+function openCreateCategoryModal() {
+  resetCategoryForm()
+  categoryModalOpen.value = true
+}
+
+function openEditCategoryModal(category) {
+  editingCategoryId.value = category.id
+  Object.assign(categoryForm, {
+    name: category.name || '',
+    description: category.description || '',
+    display_order: Number(category.display_order || 0),
+    is_active: category.is_active !== false,
+  })
+  categoryModalOpen.value = true
+}
+
 function openEditModal(food) {
   editFood(food)
   formModalOpen.value = true
@@ -253,6 +402,11 @@ function closeFormModal() {
   resetForm()
 }
 
+function closeCategoryModal() {
+  categoryModalOpen.value = false
+  resetCategoryForm()
+}
+
 function askDeleteFood(food) {
   pendingDelete.value = food
   Object.assign(popup, {
@@ -263,6 +417,19 @@ function askDeleteFood(food) {
     confirmText: t('menu.delete'),
     cancelText: t('user.cancel'),
     action: 'delete',
+  })
+}
+
+function askDeleteCategory(category) {
+  pendingDeleteCategory.value = category
+  Object.assign(popup, {
+    open: true,
+    type: 'danger',
+    title: 'Xóa danh mục',
+    message: `Bạn có chắc muốn xóa danh mục ${category.name}?`,
+    confirmText: t('menu.delete'),
+    cancelText: t('user.cancel'),
+    action: 'delete-category',
   })
 }
 
@@ -281,12 +448,31 @@ async function deleteFood(food) {
   }
 }
 
+async function deleteCategory(category) {
+  saving.value = true
+  error.value = ''
+  try {
+    await menuService.deleteCategory(category.id)
+    if (Number(categoryFilter.value) === Number(category.id)) categoryFilter.value = ''
+    await loadData()
+    showPopup('success', 'Đã xóa danh mục', 'Danh mục đã được xóa khỏi thực đơn.')
+  } catch (err) {
+    showPopup('danger', t('common.error'), err.message || 'Không thể xóa danh mục.')
+  } finally {
+    saving.value = false
+  }
+}
+
 function handlePopupConfirm() {
   const action = popup.action
   closePopup()
   if (action === 'delete' && pendingDelete.value) {
     deleteFood(pendingDelete.value)
     pendingDelete.value = null
+  }
+  if (action === 'delete-category' && pendingDeleteCategory.value) {
+    deleteCategory(pendingDeleteCategory.value)
+    pendingDeleteCategory.value = null
   }
 }
 
@@ -303,6 +489,11 @@ function resetForm() {
   selectedImageFile.value = null
   Object.assign(form, { ...blankForm })
   if (fileInput.value) fileInput.value.value = ''
+}
+
+function resetCategoryForm() {
+  editingCategoryId.value = null
+  Object.assign(categoryForm, { ...blankCategoryForm })
 }
 
 function buildFoodPayload() {
@@ -382,6 +573,7 @@ function fallbackImage(food) {
 function dishImageUrl(food) {
   return food.image_url ? resolveAssetUrl(food.image_url) : fallbackImage(food)
 }
+
 </script>
 
 <style scoped>
@@ -402,10 +594,20 @@ textarea { padding-top: 9px; min-height: 108px; resize: vertical; }
 button { border: 0; border-radius: 6px; min-height: 38px; padding: 0 14px; cursor: pointer; background: #344054; color: #fff; }
 button:disabled { opacity: .55; cursor: not-allowed; }
 .primary-action { background: #155eef; }
+.secondary-action { background: #ff5a00; }
 .ghost-action { background: #f2f4f7; color: #344054; }
 .danger { background: #b42318; }
 .state { padding: 18px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; color: #475467; }
 .state.error { color: #b42318; border-color: #fecdca; background: #fffbfa; }
+.category-manager { margin-bottom: 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; padding: 14px; }
+.category-manager header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.category-manager header span { color: #667085; font-size: 13px; }
+.category-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.category-chip { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid #eaecf0; border-radius: 8px; background: #f9fafb; padding: 10px; }
+.category-chip strong, .category-chip small { display: block; }
+.category-chip small { color: #667085; margin-top: 3px; }
+.chip-actions { display: flex; gap: 6px; align-items: center; }
+.chip-actions button { min-height: 32px; padding: 0 10px; }
 .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 14px; }
 .dish { display: flex; flex-direction: column; justify-content: space-between; gap: 16px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; min-height: 190px; }
 .dish-image { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 6px; background: #f2f4f7; margin-bottom: 12px; }
@@ -426,7 +628,13 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .drawer-form input, .drawer-form select, .drawer-form textarea { width: 100%; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: end; }
 .drawer-switches { min-height: 38px; }
+.category-active { align-self: end; min-height: 38px; }
 .drawer-upload { font-weight: 500; }
+.pagination { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 14px; color: #344054; }
+.pagination select { width: 74px; min-height: 34px; }
+.pagination strong { display: grid; place-items: center; min-width: 34px; height: 34px; border-radius: 6px; background: #f2f4f7; color: #111827; }
+.page-button { min-width: 34px; min-height: 34px; padding: 0; background: transparent; color: #98a2b3; font-size: 24px; }
+.page-button:not(:disabled) { color: #344054; }
 .drawer-actions { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 10px; padding-top: 16px; border-top: 1px solid #eaecf0; background: #fff; }
 .drawer-fade-enter-active, .drawer-fade-leave-active { transition: opacity .18s ease; }
 .drawer-fade-enter-active .dish-drawer, .drawer-fade-leave-active .dish-drawer { transition: transform .2s ease; }
