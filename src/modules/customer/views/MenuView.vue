@@ -12,29 +12,49 @@
       <div class="topbar-center">MENU</div>
 
       <div class="topbar-actions">
-        <select v-model="selectedTableId" @change="selectTable">
-          <option value="">{{ t('customer.selectTable') }}</option>
-          <option
-            v-for="table in tables"
-            :key="table.id"
-            :value="table.id"
-            :disabled="visitMode === 'reservation' && table.status !== 'empty'"
-          >
-            {{ tableOptionLabel(table) }}
-          </option>
-        </select>
-        <button class="logout-button" :title="t('customer.logout')" @click="logout">
+        <button class="logout-button" :title="t('customer.logout')" @click="logoutConfirmOpen = true">
           <v-icon size="21">mdi-logout</v-icon>
           <span>{{ t('customer.logout') }}</span>
         </button>
-        <button class="cart-toggle" @click="cartPanelOpen = true">
+        <button v-if="selectedTableId" class="cart-toggle" @click="cartPanelOpen = true">
           <v-icon size="22">mdi-cart-outline</v-icon>
           <span v-if="cartStore.itemCount">{{ cartStore.itemCount }}</span>
         </button>
       </div>
     </header>
 
-    <section class="customer-layout">
+    <section v-if="!selectedTableId" class="table-gate">
+      <div class="table-gate-panel">
+        <div class="table-gate-heading">
+          <span class="brand-mark"><v-icon size="24">mdi-table-chair</v-icon></span>
+          <div>
+            <h1>Chọn bàn trước khi gọi món</h1>
+            <p>Vui lòng chọn bàn của bạn để xem menu, thêm món và theo dõi hóa đơn.</p>
+          </div>
+        </div>
+
+        <p v-if="tableGateError" class="state error">{{ tableGateError }}</p>
+        <p v-if="loading" class="state">Đang tải danh sách bàn...</p>
+
+        <div v-else class="table-choice-grid">
+          <button
+            v-for="table in tables"
+            :key="table.id"
+            type="button"
+            class="table-choice"
+            :class="{ busy: !canChooseTable(table) }"
+            :disabled="!canChooseTable(table)"
+            @click="selectTableFromGate(table)"
+          >
+            <strong>Bàn {{ table.table_number || table.id }}</strong>
+            <span>{{ table.capacity || 4 }} khách</span>
+            <small>{{ tableStatusLabel(table.status) }}</small>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section v-else class="customer-layout">
       <aside class="category-rail">
         <h2>{{ t('menu.category') }}</h2>
         <button :class="{ active: !selectedCategory }" @click="selectCategory(null)">
@@ -180,12 +200,12 @@
       </aside>
     </section>
 
-    <button class="floating-cart" @click="cartPanelOpen = true">
+    <button v-if="selectedTableId" class="floating-cart" @click="cartPanelOpen = true">
       <v-icon size="24">mdi-cart-outline</v-icon>
       <span>{{ cartStore.itemCount }}</span>
     </button>
 
-    <button class="ai-chat-toggle" @click="toggleAiChat">
+    <button v-if="selectedTableId" class="ai-chat-toggle" @click="toggleAiChat">
       <v-icon size="24">{{ aiChatOpen ? 'mdi-close' : 'mdi-creation' }}</v-icon>
     </button>
 
@@ -230,6 +250,18 @@
         </button>
       </form>
     </aside>
+
+    <div v-if="logoutConfirmOpen" class="confirm-backdrop" @click.self="logoutConfirmOpen = false">
+      <section class="confirm-dialog">
+        <v-icon size="34">mdi-logout</v-icon>
+        <h2>Xác nhận đăng xuất</h2>
+        <p>Bạn có chắc muốn đăng xuất khỏi tài khoản hiện tại?</p>
+        <div class="confirm-actions">
+          <button type="button" class="confirm-secondary" @click="logoutConfirmOpen = false">Hủy</button>
+          <button type="button" class="confirm-primary" @click="logout">Đăng xuất</button>
+        </div>
+      </section>
+    </div>
   </main>
 </template>
 
@@ -257,7 +289,7 @@ const foods = ref([])
 const allFoods = ref([])
 const tables = computed(() => tableStore.tables)
 const selectedCategory = ref(null)
-const selectedTableId = ref(route.params.tableId || cartStore.tableId || '')
+const selectedTableId = ref(route.params.tableId || '')
 const visitMode = ref('dine_in')
 const search = ref('')
 const foodPage = ref(1)
@@ -266,6 +298,8 @@ const cartPanelOpen = ref(false)
 const reservationOpen = ref(false)
 const loading = ref(false)
 const error = ref('')
+const tableGateError = ref('')
+const logoutConfirmOpen = ref(false)
 const aiChatOpen = ref(false)
 const aiQuestion = ref('')
 const aiLoading = ref(false)
@@ -368,6 +402,33 @@ async function selectCategory(category) {
   error.value = ''
 }
 
+function canChooseTable(table) {
+  return ['empty', 'available'].includes(table?.status || 'empty')
+}
+
+function tableStatusLabel(status) {
+  const labels = {
+    empty: 'Trống',
+    available: 'Trống',
+    occupied: 'Đang dùng',
+    reserved: 'Đã đặt',
+    maintenance: 'Bảo trì',
+  }
+
+  return labels[status] || 'Trống'
+}
+
+async function selectTableFromGate(table) {
+  if (!canChooseTable(table)) {
+    tableGateError.value = 'Bàn này hiện không trống. Vui lòng chọn bàn khác.'
+    return
+  }
+
+  tableGateError.value = ''
+  selectedTableId.value = table.id
+  await selectTable()
+}
+
 function setFoodPage(page) {
   foodPage.value = Math.min(Math.max(page, 1), totalFoodPages.value)
   window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -445,6 +506,7 @@ function closeAiChat() {
 }
 
 async function selectTable() {
+  if (!selectedTableId.value) return
   cartStore.setTable(selectedTableId.value)
   if (selectedTableId.value && route.params.tableId !== String(selectedTableId.value)) {
     router.replace(`/menu/table/${selectedTableId.value}`)
@@ -624,6 +686,10 @@ function statusLabel(status, orderStatus = '') {
 }
 
 async function logout() {
+  logoutConfirmOpen.value = false
+  if (!activeInvoice.value && cartStore.items.length) {
+    cartStore.clearCart()
+  }
   await authStore.logout()
   router.push('/login')
 }
@@ -699,11 +765,22 @@ function formatPrice(price) {
 .brand-block small { color: #667085; font-size: 12px; }
 .topbar-center { font-weight: 800; font-size: 18px; letter-spacing: .02em; }
 .topbar-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; min-width: 0; }
-.topbar-actions select { width: 190px; min-height: 36px; border: 1px solid #d0d5dd; border-radius: 7px; background: #fff; padding: 0 9px; }
 .logout-button { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; border: 1px solid #e5e7eb; border-radius: 999px; background: #fff; color: #344054; padding: 0 12px; cursor: pointer; font-weight: 800; }
 .logout-button:hover { border-color: #ff5a00; color: #ff5a00; background: #fff7ed; }
 .cart-toggle { position: relative; display: grid; place-items: center; width: 38px; height: 38px; border: 0; border-radius: 999px; background: #fff4ed; color: #ff5a00; cursor: pointer; }
 .cart-toggle span, .floating-cart span { position: absolute; top: -3px; right: -3px; display: grid; place-items: center; min-width: 18px; height: 18px; border-radius: 999px; background: #d92d20; color: #fff; font-size: 11px; font-weight: 900; }
+.table-gate { display: grid; place-items: start center; min-height: calc(100vh - 58px); padding: 28px 16px 48px; background: #f6f6f4; }
+.table-gate-panel { width: min(860px, 100%); border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; box-shadow: 0 18px 45px rgba(15, 23, 42, .10); padding: 18px; }
+.table-gate-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.table-gate-heading h1 { margin: 0; color: #151515; font-size: 22px; font-weight: 900; }
+.table-gate-heading p { margin: 3px 0 0; color: #667085; font-size: 14px; }
+.table-choice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.table-choice { display: grid; gap: 5px; min-height: 104px; border: 1px solid #fed7aa; border-radius: 8px; background: #fff7ed; color: #344054; padding: 12px; cursor: pointer; text-align: left; }
+.table-choice strong { color: #ff5a00; font-size: 16px; font-weight: 900; }
+.table-choice span, .table-choice small { color: #667085; font-size: 13px; }
+.table-choice:not(:disabled):hover { border-color: #ff5a00; box-shadow: 0 10px 22px rgba(255, 90, 0, .14); transform: translateY(-1px); }
+.table-choice.busy { border-color: #e5e7eb; background: #f2f4f7; cursor: not-allowed; opacity: .7; }
+.table-choice.busy strong { color: #667085; }
 .customer-layout { display: grid; grid-template-columns: 138px minmax(0, 1fr); gap: 18px; width: min(1420px, calc(100% - 34px)); margin: 0 auto; }
 .category-rail { position: sticky; top: 58px; align-self: start; height: calc(100vh - 58px); padding-top: 12px; border-right: 1px solid #e5e7eb; background: #fff; }
 .category-rail h2 { margin: 0 0 8px; color: #667085; font-size: 13px; font-weight: 800; text-transform: uppercase; }
@@ -784,6 +861,14 @@ function formatPrice(price) {
 .ai-input input { min-width: 0; height: 40px; border: 1px solid #d0d5dd; border-radius: 7px; padding: 0 10px; outline: 0; }
 .ai-input button { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 7px; background: #ff5a00; color: #fff; cursor: pointer; }
 .ai-input button:disabled { opacity: .55; cursor: not-allowed; }
+.confirm-backdrop { position: fixed; inset: 0; z-index: 2600; display: grid; place-items: center; background: rgba(15, 23, 42, .48); padding: 16px; }
+.confirm-dialog { width: min(380px, 100%); border-radius: 8px; background: #fff; padding: 22px; box-shadow: 0 24px 60px rgba(15, 23, 42, .25); text-align: center; }
+.confirm-dialog h2 { margin: 10px 0 6px; font-size: 20px; font-weight: 900; color: #151515; }
+.confirm-dialog p { margin: 0; color: #667085; line-height: 1.5; }
+.confirm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+.confirm-actions button { min-height: 40px; border-radius: 7px; cursor: pointer; font-weight: 900; }
+.confirm-secondary { border: 1px solid #d0d5dd; background: #fff; color: #344054; }
+.confirm-primary { border: 0; background: #ff5a00; color: #fff; }
 @media (max-width: 1100px) {
   .customer-layout { grid-template-columns: 124px minmax(0, 1fr); }
   .cart-panel { width: min(340px, 92vw); }
@@ -794,7 +879,6 @@ function formatPrice(price) {
 @media (max-width: 760px) {
   .customer-topbar { grid-template-columns: 1fr auto; }
   .topbar-center { display: none; }
-  .topbar-actions select { display: none; }
   .logout-button span { display: none; }
   .logout-button { width: 38px; padding: 0; justify-content: center; }
   .customer-layout { display: block; width: min(100% - 24px, 680px); }
